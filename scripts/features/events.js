@@ -30,11 +30,20 @@ function bindGroupEvents() {
         renderTab('chars');
         showToast('已新增角色分组');
     });
+
+    if (outfitGroupAddBtn) {
+        outfitGroupAddBtn.addEventListener('click', async function () {
+            await addOutfitGroup();
+        });
+    }
 }
 
 function bindListEvents() {
-    ['list-chars', 'list-actions', 'list-env'].forEach(function (id) {
+    ['list-chars', 'list-actions', 'list-env', 'list-outfit'].forEach(function (id) {
         const list = document.getElementById(id);
+        if (!list) {
+            return;
+        }
         list.addEventListener('click', async function (event) {
             const btn = event.target.closest('button');
             if (!btn) {
@@ -58,10 +67,27 @@ function bindListEvents() {
                 return;
             }
 
+            if (action === 'rename-outfit-group') {
+                await renameOutfitGroup(btn.dataset.groupId, btn.dataset.groupTitle || '');
+                return;
+            }
+
+            if (action === 'delete-outfit-group') {
+                await deleteOutfitGroup(btn.dataset.groupId, btn.dataset.groupTitle || '');
+                return;
+            }
+
             if (action === 'add-item-start') {
                 addState = { tabId: btn.dataset.tabId, groupId: btn.dataset.groupId };
                 editState = null;
                 renderTab(btn.dataset.tabId);
+                return;
+            }
+
+            if (action === 'add-outfit-item-start') {
+                addState = { tabId: 'outfit', groupId: btn.dataset.groupId, categoryKey: btn.dataset.categoryKey || '' };
+                editState = null;
+                renderTab('outfit');
                 return;
             }
 
@@ -105,7 +131,8 @@ function bindListEvents() {
                 const tabId = itemNode.dataset.tabId;
                 const groupId = itemNode.dataset.groupId;
                 const itemId = itemNode.dataset.itemId;
-                startEdit(tabId, groupId, itemId);
+                const categoryKey = itemNode.dataset.categoryKey || '';
+                startEdit(tabId, groupId, itemId, categoryKey);
                 return;
             }
 
@@ -128,8 +155,13 @@ function bindListEvents() {
                 const tabId = itemNode.dataset.tabId;
                 const groupId = itemNode.dataset.groupId;
                 const itemId = itemNode.dataset.itemId;
+                const categoryKey = itemNode.dataset.categoryKey || '';
                 const itemName = btn.dataset.itemName || '该条目';
-                deleteItem(tabId, groupId, itemId, itemName);
+                if (tabId === 'outfit') {
+                    await deleteOutfitItem(groupId, categoryKey, itemId, itemName);
+                } else {
+                    await deleteItem(tabId, groupId, itemId, itemName);
+                }
             }
         });
     });
@@ -137,19 +169,62 @@ function bindListEvents() {
 
 function bindTagFilterEvents() {
     if (!charTagFilters) {
-        return;
-    }
-
-    charTagFilters.addEventListener('click', function (event) {
-        const btn = event.target.closest('button[data-action="filter-tag"]');
-        if (!btn) {
+        if (!outfitCategoryFilters) {
             return;
         }
+    }
 
-        activeCharTag = btn.dataset.tag || '__all__';
-        renderCharTagFilters();
-        renderTab('chars');
-    });
+    if (charTagFilters) {
+        charTagFilters.addEventListener('click', function (event) {
+            const toggleBtn = event.target.closest('button[data-action="filter-tag-toggle"]');
+            if (toggleBtn) {
+                activeCharTagMode = activeCharTagMode === 'and' ? 'or' : 'and';
+                renderCharTagFilters();
+                renderTab('chars');
+                return;
+            }
+
+            const clearBtn = event.target.closest('button[data-action="filter-tag-clear"]');
+            if (clearBtn) {
+                activeCharTags = [];
+                renderCharTagFilters();
+                renderTab('chars');
+                return;
+            }
+
+            const tagBtn = event.target.closest('button[data-action="filter-tag"]');
+            if (!tagBtn) {
+                return;
+            }
+
+            const nextTag = tagBtn.dataset.tag || '';
+            if (!nextTag) {
+                return;
+            }
+
+            const existingIndex = activeCharTags.indexOf(nextTag);
+            if (existingIndex > -1) {
+                activeCharTags.splice(existingIndex, 1);
+            } else {
+                activeCharTags.push(nextTag);
+            }
+            renderCharTagFilters();
+            renderTab('chars');
+        });
+    }
+
+    if (outfitCategoryFilters) {
+        outfitCategoryFilters.addEventListener('click', function (event) {
+            const btn = event.target.closest('button[data-action="filter-outfit-category"]');
+            if (!btn) {
+                return;
+            }
+
+            activeOutfitCategory = btn.dataset.category || '__all__';
+            renderOutfitCategoryFilters();
+            renderTab('outfit');
+        });
+    }
 }
 
 function bindCharSearchEvents() {

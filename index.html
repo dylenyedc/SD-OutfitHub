@@ -9,6 +9,17 @@
 </head>
 <body>
 
+    <button id="sidebar-toggle-btn" class="sidebar-toggle-btn" type="button" aria-label="打开导航">☰</button>
+    <aside id="left-sidebar" class="left-sidebar" aria-label="主导航">
+        <div class="sidebar-title">导航</div>
+        <button class="sidebar-nav-item active" data-page="prompts" type="button">提示词管理</button>
+        <button class="sidebar-nav-item" data-page="community" type="button">社区（开发中）</button>
+        <button class="sidebar-nav-item" data-page="profile" type="button">个人信息（开发中）</button>
+    </aside>
+    <div id="sidebar-mask" class="sidebar-mask"></div>
+
+    <div id="app-page-prompts" class="app-page active">
+
     <header>
         <h1>SD-OutfitHub 管理站</h1>
         <div class="header-desc">Stable Diffusion 服装提示词的本地管理与检索</div>
@@ -58,6 +69,23 @@
         <div id="list-env"></div>
     </div>
 
+    <div id="tab-outfit" class="container">
+        <div class="card">
+            <div class="editor-title">新增服装风格</div>
+            <div class="inline-add">
+                <input id="outfit-group-title-input" type="text" placeholder="输入风格名称，例如：街头机能风" />
+                <button id="outfit-group-add-btn" class="copy-btn" type="button">新增风格</button>
+            </div>
+            <div class="hint-text">提示：每个风格下可按上衣、下装、鞋子、头饰、配件、武器、其他分类管理提示词。</div>
+        </div>
+        <div class="card">
+            <div class="editor-title">服装分类筛选</div>
+            <div id="outfit-category-filters" class="tag-filter-wrap"></div>
+            <div class="hint-text" style="margin-top: 8px;">提示：可按分类筛选显示对应条目模块。</div>
+        </div>
+        <div id="list-outfit"></div>
+    </div>
+
     <nav>
         <div class="nav-item active" onclick="switchTab('chars', this)">
             <div class="nav-icon">👤</div>
@@ -71,7 +99,37 @@
             <div class="nav-icon">✨</div>
             <span>环境质量</span>
         </div>
+        <div class="nav-item" onclick="switchTab('outfit', this)">
+            <div class="nav-icon">👗</div>
+            <span>服装</span>
+        </div>
     </nav>
+
+    </div>
+
+    <div id="app-page-community" class="app-page">
+        <header>
+            <h1>社区</h1>
+            <div class="header-desc">该模块开发中</div>
+        </header>
+        <div class="container active">
+            <div class="card">
+                <div class="hint-text">社区功能正在开发中，敬请期待。</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="app-page-profile" class="app-page">
+        <header>
+            <h1>个人信息</h1>
+            <div class="header-desc">该模块开发中</div>
+        </header>
+        <div class="container active">
+            <div class="card">
+                <div class="hint-text">个人信息功能正在开发中，敬请期待。</div>
+            </div>
+        </div>
+    </div>
 
     <div id="toast">已复制到剪贴板</div>
 

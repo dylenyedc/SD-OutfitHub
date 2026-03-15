@@ -20,7 +20,7 @@
       },
       "section": {
         "type": "string",
-        "enum": ["chars", "actions", "env"],
+        "enum": ["chars", "actions", "env", "outfit"],
         "description": "限定检索范围（可选）"
       },
       "limit": {
@@ -61,6 +61,7 @@
             "itemId": { "type": "string" },
             "itemName": { "type": "string" },
             "prompt": { "type": "string" },
+            "categoryKey": { "type": "string" },
             "tags": {
               "type": "array",
               "items": { "type": "string" }

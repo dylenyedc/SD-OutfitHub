@@ -86,7 +86,7 @@ function searchPromptDatabase(data, keyword, options = {}) {
     return [];
   }
 
-  const sections = ['chars', 'actions', 'env'];
+  const sections = ['chars', 'actions', 'env', 'outfit'];
   const targetSections = sectionFilter && sections.includes(sectionFilter)
     ? [sectionFilter]
     : sections;
@@ -100,12 +100,31 @@ function searchPromptDatabase(data, keyword, options = {}) {
       const groupId = group.id || '';
       const groupTitle = group.title || '';
       const groupTags = Array.isArray(group.tags) ? group.tags : [];
-      const items = Array.isArray(group.items) ? group.items : [];
+      const items = [];
+
+      if (section === 'outfit') {
+        const categoryKeys = ['tops', 'bottoms', 'shoes', 'headwear', 'accessories', 'weapons', 'others'];
+        for (const categoryKey of categoryKeys) {
+          const categoryItems = Array.isArray(group[categoryKey]) ? group[categoryKey] : [];
+          for (const item of categoryItems) {
+            items.push({
+              ...item,
+              categoryKey
+            });
+          }
+        }
+      } else {
+        const groupItems = Array.isArray(group.items) ? group.items : [];
+        for (const item of groupItems) {
+          items.push(item);
+        }
+      }
 
       for (const item of items) {
         const itemId = item.id || '';
         const itemName = item.name || '';
         const prompt = item.prompt || '';
+        const categoryKey = item.categoryKey || '';
         const matchedFields = [];
         let totalScore = 0;
 
@@ -119,6 +138,24 @@ function searchPromptDatabase(data, keyword, options = {}) {
         if (titleScore > 0) {
           matchedFields.push('group.title');
           totalScore += titleScore + 20;
+        }
+
+        if (section === 'outfit' && categoryKey) {
+          const categoryLabelMap = {
+            tops: '上衣',
+            bottoms: '下装',
+            shoes: '鞋子',
+            headwear: '头饰',
+            accessories: '配件',
+            weapons: '武器',
+            others: '其他'
+          };
+          const categoryLabel = categoryLabelMap[categoryKey] || categoryKey;
+          const categoryScore = scoreField(keyword, normalizedKeyword, categoryLabel);
+          if (categoryScore > 0) {
+            matchedFields.push('outfit.category');
+            totalScore += categoryScore + 10;
+          }
         }
 
         const tagScore = groupTags.reduce((best, tag) => Math.max(best, scoreField(keyword, normalizedKeyword, tag)), 0);
@@ -141,6 +178,7 @@ function searchPromptDatabase(data, keyword, options = {}) {
             itemId,
             itemName,
             prompt,
+            categoryKey,
             tags: groupTags,
             score: totalScore,
             matchedFields
@@ -281,7 +319,7 @@ function handleStatic(req, res) {
 
 function ensureDataFile() {
   if (!fs.existsSync(DATA_FILE)) {
-    writeDataFile({ chars: [], actions: [], env: [] });
+    writeDataFile({ chars: [], actions: [], env: [], outfit: [] });
   }
 }
 

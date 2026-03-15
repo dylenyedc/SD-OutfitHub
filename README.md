@@ -21,6 +21,10 @@
 	- `actions.js`：增删改、复制、Toast 等业务动作
 	- `events.js`：按钮与输入框事件绑定
 - 加载顺序：`core/state -> core/utils -> core/data -> features/render -> features/actions -> features/events -> core/main`
+- 业务模块：`人物 / 动作 / 环境质量 / 服装`
+- 服装模块结构：按“风格”分组，每个风格下含 `上衣(tops) / 下装(bottoms) / 鞋子(shoes) / 头饰(headwear) / 配件(accessories) / 武器(weapons) / 其他(others)` 子分类
+- 服装页支持按子分类筛选显示（全部 / 上衣 / 下装 / 鞋子 / 头饰 / 配件 / 武器 / 其他）
+- 角色标签支持分类写法：`分类:标签`（例如 `阵营:维多利亚`），筛选区会按分类分组展示
 
 快速使用
 1. 在项目目录运行：`npm install`
@@ -35,7 +39,7 @@ Agent Skill（关键词检索提示词）
 查询参数
 - `keyword` 或 `q`：检索关键词（必填）
 - `limit`：返回数量，默认 10，最大 100
-- `section`：限定检索范围，可选 `chars` / `actions` / `env`
+- `section`：限定检索范围，可选 `chars` / `actions` / `env` / `outfit`
 
 示例
 - `/api/agent-skill/search?keyword=goldenglow`

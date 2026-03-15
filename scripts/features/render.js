@@ -1,13 +1,21 @@
 function renderAllTabs() {
     renderCharTagFilters();
+    renderOutfitCategoryFilters();
     renderTab('chars');
     renderTab('actions');
     renderTab('env');
+    renderTab('outfit');
 }
 
 function renderTab(tabId) {
     const listNode = document.getElementById('list-' + tabId);
     const groups = promptData[tabId] || [];
+
+    if (tabId === 'outfit') {
+        renderOutfitTab(listNode, groups);
+        return;
+    }
+
     const visibleGroups = tabId === 'chars' ? getVisibleCharGroups(groups) : groups;
 
     listNode.innerHTML = visibleGroups.map(group => {
@@ -44,22 +52,193 @@ function renderTab(tabId) {
     }
 }
 
+function renderOutfitTab(listNode, groups) {
+    const visibleCategoryKeys = getVisibleOutfitCategoryKeys();
+
+    listNode.innerHTML = groups.map(function (group) {
+        const categoryBlocks = visibleCategoryKeys.map(function (categoryKey) {
+            const items = Array.isArray(group[categoryKey]) ? group[categoryKey] : [];
+            const itemsHtml = items.map(function (item) {
+                const isEditing = !!editState
+                    && editState.tabId === 'outfit'
+                    && editState.groupId === group.id
+                    && editState.itemId === item.id
+                    && editState.categoryKey === categoryKey;
+                const previewHtml = isEditing
+                    ? '<div class="preview-box active"><div class="inline-item-form" data-inline-form="edit"><input class="inline-item-name" type="text" value="' + escapeAttr(item.name) + '" placeholder="条目名称" /><textarea class="inline-item-prompt" placeholder="提示词内容">' + escapeHtml(item.prompt) + '</textarea><div class="form-actions"><button class="copy-btn" data-action="edit-inline-save">保存</button><button class="copy-btn secondary-btn" data-action="edit-inline-cancel">取消</button></div></div></div>'
+                    : '<div class="preview-box">' + escapeHtml(item.prompt) + '</div>';
+
+                return '\n                    <div class="prompt-item" data-item-id="' + item.id + '" data-group-id="' + group.id + '" data-tab-id="outfit" data-category-key="' + categoryKey + '">\n                        <div class="prompt-main">\n                            <span class="prompt-name">' + escapeHtml(item.name) + '</span>\n                            <div class="prompt-actions">\n                                <button class="copy-btn" data-action="copy" data-prompt="' + escapeAttr(item.prompt) + '">复制</button>\n                                <button class="copy-btn secondary-btn" data-action="edit">编辑</button>\n                                <button class="copy-btn secondary-btn" data-action="preview">预览</button>\n                                <button class="copy-btn danger-btn" data-action="delete" data-item-name="' + escapeAttr(item.name) + '">删除</button>\n                            </div>\n                        </div>\n                        ' + previewHtml + '\n                    </div>\n                ';
+            }).join('');
+
+            const addFormHtml = (addState
+                && addState.tabId === 'outfit'
+                && addState.groupId === group.id
+                && addState.categoryKey === categoryKey)
+                ? '<div class="inline-item-form" data-inline-form="add" data-tab-id="outfit" data-group-id="' + group.id + '" data-category-key="' + categoryKey + '"><input class="inline-item-name" type="text" placeholder="输入条目名称" /><textarea class="inline-item-prompt" placeholder="输入完整提示词"></textarea><div class="form-actions"><button class="copy-btn" data-action="add-item-save">保存新增</button><button class="copy-btn secondary-btn" data-action="add-item-cancel">取消</button></div></div>'
+                : '';
+
+            return '\n                <div class="outfit-section">\n                    <div class="outfit-section-title">' + OUTFIT_CATEGORY_LABELS[categoryKey] + '</div>\n                    ' + (itemsHtml || '<div class="hint-text">当前分类暂无提示词。</div>') + '\n                    <div class="group-actions"><button class="copy-btn" data-action="add-outfit-item-start" data-tab-id="outfit" data-group-id="' + group.id + '" data-category-key="' + categoryKey + '">新增' + OUTFIT_CATEGORY_LABELS[categoryKey] + '</button></div>\n                    ' + addFormHtml + '\n                </div>\n            ';
+        }).join('');
+
+        return '\n            <div class="card">\n                <div class="card-header">\n                    <div class="card-title">' + escapeHtml(group.title) + '</div>\n                    <div class="group-actions">\n                        <button class="copy-btn secondary-btn" data-action="rename-outfit-group" data-group-id="' + group.id + '" data-group-title="' + escapeAttr(group.title) + '">编辑风格名</button>\n                        <button class="copy-btn danger-btn" data-action="delete-outfit-group" data-group-id="' + group.id + '" data-group-title="' + escapeAttr(group.title) + '">删除风格</button>\n                    </div>\n                </div>\n                ' + categoryBlocks + '\n            </div>\n        ';
+    }).join('');
+
+    if (!groups.length) {
+        listNode.innerHTML = '<div class="card"><div class="hint-text">当前暂无服装风格，请先新增风格。</div></div>';
+    }
+}
+
+function renderOutfitCategoryFilters() {
+    if (!outfitCategoryFilters) {
+        return;
+    }
+
+    const allBtn = '<button class="tag-chip' + (activeOutfitCategory === '__all__' ? ' active' : '') + '" data-action="filter-outfit-category" data-category="__all__">全部分类</button>';
+    const categoryBtns = OUTFIT_CATEGORY_KEYS.map(function (categoryKey) {
+        const isActive = categoryKey === activeOutfitCategory;
+        return '<button class="tag-chip' + (isActive ? ' active' : '') + '" data-action="filter-outfit-category" data-category="' + categoryKey + '">' + OUTFIT_CATEGORY_LABELS[categoryKey] + '</button>';
+    }).join('');
+
+    outfitCategoryFilters.innerHTML = allBtn + categoryBtns;
+}
+
+function getVisibleOutfitCategoryKeys() {
+    if (activeOutfitCategory === '__all__') {
+        return OUTFIT_CATEGORY_KEYS;
+    }
+    return OUTFIT_CATEGORY_KEYS.indexOf(activeOutfitCategory) > -1 ? [activeOutfitCategory] : OUTFIT_CATEGORY_KEYS;
+}
+
 function renderCharTagFilters() {
     if (!charTagFilters) {
         return;
     }
 
     const tags = collectCharTags();
-    const allBtn = '<button class="tag-chip' + (activeCharTag === '__all__' ? ' active' : '') + '" data-action="filter-tag" data-tag="__all__">全部</button>';
-    const tagBtns = tags.map(function (tag) {
-        const isActive = tag === activeCharTag;
-        return '<button class="tag-chip' + (isActive ? ' active' : '') + '" data-action="filter-tag" data-tag="' + escapeAttr(tag) + '">' + escapeHtml(tag) + '</button>';
+    const modeHtml = '<div class="tag-filter-toolbar"><button class="tag-mode-switch' + (activeCharTagMode === 'or' ? ' is-or' : ' is-and') + '" data-action="filter-tag-toggle" type="button" aria-label="切换标签筛选模式"><span class="tag-mode-text">与</span><span class="tag-mode-text">或</span><span class="tag-mode-knob"></span></button><button class="tag-clear-btn" data-action="filter-tag-clear" type="button">清空筛选</button></div>';
+    if (!tags.length) {
+        charTagFilters.innerHTML = '<div class="tag-filter-panel">' + modeHtml + '<span class="tag-empty">暂无标签</span></div>';
+        return;
+    }
+
+    const groupedTags = groupCharTags(tags);
+    const groupedHtml = CHAR_TAG_CATEGORY_ORDER.filter(function (categoryName) {
+        return groupedTags[categoryName] && groupedTags[categoryName].length;
+    }).map(function (categoryName) {
+        const chips = groupedTags[categoryName].map(function (tagMeta) {
+            const isActive = activeCharTags.indexOf(tagMeta.raw) > -1;
+            return '<button class="tag-chip' + (isActive ? ' active' : '') + '" data-action="filter-tag" data-tag="' + escapeAttr(tagMeta.raw) + '">' + escapeHtml(tagMeta.label) + '</button>';
+        }).join('');
+
+        return '<div class="tag-category-group"><div class="tag-category-title">' + escapeHtml(categoryName) + '</div><div class="tag-filter-wrap">' + chips + '</div></div>';
     }).join('');
 
-    charTagFilters.innerHTML = allBtn + tagBtns;
-    if (!tags.length) {
-        charTagFilters.innerHTML = allBtn + '<span class="tag-empty">暂无标签</span>';
+    charTagFilters.innerHTML = '<div class="tag-filter-panel">' + modeHtml + '<div class="tag-group-list">' + groupedHtml + '</div></div>';
+}
+
+const CHAR_TAG_CATEGORY_ORDER = ['按作品分类', '按性别分类', '按SFW NSFW分类', '其他标签'];
+
+function groupCharTags(tags) {
+    const grouped = {
+        '按作品分类': [],
+        '按性别分类': [],
+        '按SFW NSFW分类': [],
+        '其他标签': []
+    };
+
+    tags.forEach(function (tag) {
+        const meta = parseTagMeta(tag);
+        grouped[meta.category].push(meta);
+    });
+
+    return grouped;
+}
+
+function parseTagMeta(tag) {
+    const raw = String(tag || '').trim();
+    if (!raw) {
+        return {
+            raw: '',
+            category: '其他标签',
+            label: ''
+        };
     }
+
+    const explicit = parseExplicitTag(raw);
+    if (explicit) {
+        return explicit;
+    }
+
+    const normalized = raw.toLowerCase();
+
+    if (isGenderTag(normalized)) {
+        return {
+            raw: raw,
+            category: '按性别分类',
+            label: raw
+        };
+    }
+
+    if (isRatingTag(normalized)) {
+        return {
+            raw: raw,
+            category: '按SFW NSFW分类',
+            label: raw
+        };
+    }
+
+    return {
+        raw: raw,
+        category: '其他标签',
+        label: raw
+    };
+}
+
+function parseExplicitTag(rawTag) {
+    const separators = [':', '：'];
+    for (let index = 0; index < separators.length; index += 1) {
+        const separator = separators[index];
+        const splitAt = rawTag.indexOf(separator);
+        if (splitAt <= 0 || splitAt >= rawTag.length - 1) {
+            continue;
+        }
+
+        const prefix = rawTag.slice(0, splitAt).trim().toLowerCase();
+        const label = rawTag.slice(splitAt + 1).trim();
+        if (!label) {
+            continue;
+        }
+
+        if (['作品', '按作品分类', 'work', 'ip', 'title', '系列'].indexOf(prefix) > -1) {
+            return { raw: rawTag, category: '按作品分类', label: label };
+        }
+        if (['性别', '按性别分类', 'gender'].indexOf(prefix) > -1) {
+            return { raw: rawTag, category: '按性别分类', label: label };
+        }
+        if (['sfw', 'nsfw', '分级', 'rating', '按sfw nsfw分类'].indexOf(prefix) > -1) {
+            return { raw: rawTag, category: '按SFW NSFW分类', label: label };
+        }
+        if (['其他', '其他标签', 'other', 'others'].indexOf(prefix) > -1) {
+            return { raw: rawTag, category: '其他标签', label: label };
+        }
+    }
+
+    return null;
+}
+
+function isGenderTag(normalizedTag) {
+    const keywords = ['男', '女', '男性', '女性', 'male', 'female', 'boy', 'girl', 'man', 'woman'];
+    return keywords.some(function (keyword) {
+        return normalizedTag.indexOf(keyword) > -1;
+    });
+}
+
+function isRatingTag(normalizedTag) {
+    const keywords = ['sfw', 'nsfw', 'r18', '18+', 'safe', 'explicit'];
+    return keywords.some(function (keyword) {
+        return normalizedTag.indexOf(keyword) > -1;
+    });
 }
 
 function collectCharTags() {
@@ -76,8 +255,15 @@ function collectCharTags() {
 }
 
 function getVisibleCharGroups(groups) {
+    const selectedTags = activeCharTags.filter(function (tag) {
+        return !!tag;
+    });
+
     return groups.filter(function (group) {
-        const passTag = activeCharTag === '__all__' || (group.tags || []).indexOf(activeCharTag) > -1;
+        const groupTags = group.tags || [];
+        const passTag = !selectedTags.length || (activeCharTagMode === 'and'
+            ? selectedTags.every(function (tag) { return groupTags.indexOf(tag) > -1; })
+            : selectedTags.some(function (tag) { return groupTags.indexOf(tag) > -1; }));
         const passKeyword = !activeCharKeyword || String(group.title || '').toLowerCase().indexOf(activeCharKeyword) > -1;
         return passTag && passKeyword;
     });
@@ -89,7 +275,9 @@ function renderCardTags(tags) {
     }
 
     const chips = tags.map(function (tag) {
-        return '<span class="card-tag">' + escapeHtml(tag) + '</span>';
+        const meta = parseTagMeta(tag);
+        const label = meta.label;
+        return '<span class="card-tag">' + escapeHtml(label) + '</span>';
     }).join('');
     return '<div class="card-tags">' + chips + '</div>';
 }
@@ -108,7 +296,8 @@ function switchToTab(tabId, element) {
             const tabText = item.textContent || '';
             if ((tabId === 'chars' && tabText.indexOf('人物') > -1) ||
                 (tabId === 'actions' && tabText.indexOf('动作') > -1) ||
-                (tabId === 'env' && tabText.indexOf('环境质量') > -1)) {
+                (tabId === 'env' && tabText.indexOf('环境质量') > -1) ||
+                (tabId === 'outfit' && tabText.indexOf('服装') > -1)) {
                 item.classList.add('active');
             }
         });

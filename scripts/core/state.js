@@ -45,21 +45,55 @@ const defaultPromptData = {
                 { id: 'eq-2', name: '二次元质感', prompt: 'anime visual novel style, studio ghibli, vivid colors, clear lines, high contrast' }
             ]
         }
+    ],
+    outfit: [
+        {
+            id: 'outfit-street-tech',
+            title: '🧥 街头机能风',
+            tops: [
+                { id: 'ot-st-1', name: '机能短夹克', prompt: 'techwear cropped jacket, functional pockets, nylon texture, matte black, detailed seams' }
+            ],
+            bottoms: [
+                { id: 'ob-st-1', name: '束脚工装裤', prompt: 'cargo jogger pants, tactical straps, layered panels, urban techwear style' }
+            ],
+            shoes: [
+                { id: 'os-st-1', name: '厚底机能鞋', prompt: 'chunky tech sneakers, high-top silhouette, monochrome design, streetwear fashion' }
+            ],
+            headwear: [],
+            accessories: [],
+            weapons: [],
+            others: []
+        }
     ]
 };
 
-const TAB_KEYS = ['chars', 'actions', 'env'];
+const TAB_KEYS = ['chars', 'actions', 'env', 'outfit'];
+const OUTFIT_CATEGORY_KEYS = ['tops', 'bottoms', 'shoes', 'headwear', 'accessories', 'weapons', 'others'];
+const OUTFIT_CATEGORY_LABELS = {
+    tops: '上衣',
+    bottoms: '下装',
+    shoes: '鞋子',
+    headwear: '头饰',
+    accessories: '配件',
+    weapons: '武器',
+    others: '其他'
+};
 
 let promptData = JSON.parse(JSON.stringify(defaultPromptData));
 let activeTab = 'chars';
 let editState = null;
 let addState = null;
-let activeCharTag = '__all__';
+let activeCharTags = [];
+let activeCharTagMode = 'or';
 let activeCharKeyword = '';
+let activeOutfitCategory = '__all__';
 let toastTimeout;
 
 const charGroupTitleInput = document.getElementById('char-group-title-input');
 const charGroupAddBtn = document.getElementById('char-group-add-btn');
+const outfitGroupTitleInput = document.getElementById('outfit-group-title-input');
+const outfitGroupAddBtn = document.getElementById('outfit-group-add-btn');
+const outfitCategoryFilters = document.getElementById('outfit-category-filters');
 const charTagFilters = document.getElementById('char-tag-filters');
 const charNameSearch = document.getElementById('char-name-search');
 const charNameSearchClear = document.getElementById('char-name-search-clear');

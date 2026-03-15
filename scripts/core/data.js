@@ -46,6 +46,16 @@ function normalizePromptData(data) {
         }
     });
 
+    ['chars', 'actions', 'env'].forEach(function (tabKey) {
+        normalized[tabKey] = normalized[tabKey].map(function (group) {
+            const nextGroup = group && typeof group === 'object' ? deepClone(group) : { id: newId(), title: '未命名分组', items: [] };
+            if (!Array.isArray(nextGroup.items)) {
+                nextGroup.items = [];
+            }
+            return nextGroup;
+        });
+    });
+
     normalized.chars = normalized.chars.map(function (group) {
         const nextGroup = group && typeof group === 'object' ? deepClone(group) : { id: newId(), title: '未命名角色', items: [] };
         if (!Array.isArray(nextGroup.items)) {
@@ -54,6 +64,20 @@ function normalizePromptData(data) {
         if (!Array.isArray(nextGroup.tags)) {
             nextGroup.tags = [];
         }
+        return nextGroup;
+    });
+
+    normalized.outfit = normalized.outfit.map(function (group) {
+        const nextGroup = group && typeof group === 'object'
+            ? deepClone(group)
+            : { id: newId(), title: '未命名风格', tops: [], bottoms: [], shoes: [] };
+
+        OUTFIT_CATEGORY_KEYS.forEach(function (categoryKey) {
+            if (!Array.isArray(nextGroup[categoryKey])) {
+                nextGroup[categoryKey] = [];
+            }
+        });
+
         return nextGroup;
     });
 
