@@ -10,6 +10,18 @@
 - `package.json` — 依赖与启动脚本
 - `start-windows.bat` — 便于在 Windows 下启动
 
+前端架构（简版）
+- `scripts/core/`：基础层（状态、工具、数据读写、启动入口）
+	- `state.js`：全局状态与 DOM 引用
+	- `utils.js`：通用工具函数（转义、深拷贝、ID、标签解析）
+	- `data.js`：与 `/api/prompts` 的读写和数据标准化
+	- `main.js`：应用初始化与启动
+- `scripts/features/`：功能层（界面渲染、业务动作、事件绑定）
+	- `render.js`：卡片与筛选渲染、切页显示
+	- `actions.js`：增删改、复制、Toast 等业务动作
+	- `events.js`：按钮与输入框事件绑定
+- 加载顺序：`core/state -> core/utils -> core/data -> features/render -> features/actions -> features/events -> core/main`
+
 快速使用
 1. 在项目目录运行：`npm install`
 2. 启动：`npm start` 或 双击 `start-windows.bat`
