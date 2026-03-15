@@ -1,0 +1,88 @@
+{
+  "name": "prompt-search",
+  "version": "1.0.0",
+  "description": "按关键词检索本地提示词数据库，支持模糊匹配并返回最相关结果。",
+  "type": "http-api-skill",
+  "entrypoint": {
+    "method": "GET",
+    "path": "/api/agent-skill/search"
+  },
+  "input": {
+    "type": "object",
+    "properties": {
+      "keyword": {
+        "type": "string",
+        "description": "检索关键词（必填）"
+      },
+      "q": {
+        "type": "string",
+        "description": "`keyword` 的别名（可选）"
+      },
+      "section": {
+        "type": "string",
+        "enum": ["chars", "actions", "env"],
+        "description": "限定检索范围（可选）"
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100,
+        "default": 10,
+        "description": "返回条数上限"
+      }
+    },
+    "required": ["keyword"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "skill": {
+        "type": "string",
+        "example": "prompt-search"
+      },
+      "query": {
+        "type": "string"
+      },
+      "section": {
+        "type": "string",
+        "example": "all"
+      },
+      "total": {
+        "type": "integer"
+      },
+      "results": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "section": { "type": "string" },
+            "groupId": { "type": "string" },
+            "groupTitle": { "type": "string" },
+            "itemId": { "type": "string" },
+            "itemName": { "type": "string" },
+            "prompt": { "type": "string" },
+            "tags": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "score": { "type": "number" },
+            "matchedFields": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "name": "按英文角色名查询",
+      "request": "/api/agent-skill/search?keyword=goldenglow"
+    },
+    {
+      "name": "按中文关键词模糊检索并限制范围",
+      "request": "/api/agent-skill/search?q=礼服&section=chars&limit=20"
+    }
+  ]
+}
