@@ -28,7 +28,7 @@ before(async () => {
 
 // Clean up the test DB after all tests
 after(() => {
-  try { fs.unlinkSync(TEST_DB); } catch (_) {}
+  try { fs.unlinkSync(TEST_DB); } catch (err) { console.error('Failed to delete test DB:', err.message); }
   try { fs.unlinkSync(TEST_DB + '-journal'); } catch (_) {}
 });
 

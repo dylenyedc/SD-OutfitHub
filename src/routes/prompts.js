@@ -28,7 +28,8 @@ async function assemblePromptData(userId) {
     let tags = [];
     try {
       tags = JSON.parse(g.tagsText || '[]');
-    } catch (_) {
+    } catch (parseErr) {
+      console.warn(`Failed to parse tagsText for group ${g.id} (user ${userId}):`, parseErr.message);
       tags = [];
     }
 

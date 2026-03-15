@@ -11,7 +11,7 @@ const BCRYPT_ROUNDS = 12;
 router.post('/register', async (req, res) => {
   const { email, password } = req.body || {};
 
-  if (!email || typeof email !== 'string' || !email.includes('@')) {
+  if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
     return res.status(400).json({ message: '请提供有效的邮箱地址' });
   }
   if (!password || typeof password !== 'string' || password.length < 8) {
@@ -84,11 +84,14 @@ router.post('/logout', (req, res) => {
 });
 
 // GET /api/me
-router.get('/me', (req, res) => {
+function meHandler(req, res) {
   if (req.session && req.session.userId) {
     return res.json({ id: req.session.userId, email: req.session.email });
   }
   return res.status(401).json({ message: '未登录' });
-});
+}
+
+router.get('/me', meHandler);
 
 module.exports = router;
+module.exports.meHandler = meHandler;
