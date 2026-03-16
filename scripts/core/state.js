@@ -89,6 +89,7 @@ let activeCharTags = [];
 let activeCharTagMode = 'or';
 let activeCharKeyword = '';
 let activeOutfitCategory = '__all__';
+let isReadOnlyMode = false;
 let toastTimeout;
 
 const charGroupTitleInput = document.getElementById('char-group-title-input');

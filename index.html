@@ -23,6 +23,7 @@
     <header>
         <h1>SD-OutfitHub 管理站</h1>
         <div class="header-desc">Stable Diffusion 服装提示词的本地管理与检索</div>
+        <div id="readonly-mode-tip" class="hint-text" style="margin-top: 8px;">当前为只读模式：可浏览数据，登录后才能新增、编辑、删除。</div>
     </header>
 
     <div id="tab-chars" class="container active">
@@ -149,11 +150,16 @@
     <div id="app-page-profile" class="app-page">
         <header>
             <h1>个人信息</h1>
-            <div class="header-desc">该模块开发中</div>
+            <div class="header-desc">GitHub 登录与会话管理</div>
         </header>
         <div class="container active">
             <div class="card">
-                <div class="hint-text">个人信息功能正在开发中，敬请期待。</div>
+                <div id="auth-status-text" class="hint-text" style="margin-bottom: 10px;">当前未登录</div>
+                <div class="group-actions">
+                    <button id="github-login-btn" class="copy-btn" type="button">使用 GitHub 登录</button>
+                    <button id="logout-btn" class="copy-btn secondary-btn" type="button">退出登录</button>
+                    <button id="export-prompts-btn" class="copy-btn secondary-btn" type="button">下载 prompt-data.json</button>
+                </div>
             </div>
         </div>
     </div>

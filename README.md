@@ -4,9 +4,10 @@
 主要文件
 - `index.html` — 前端界面
 - `server.js` — Express 后端（静态托管 + 数据 API + 检索 API）
+- `db.js` — SQLite 数据层（建表、读写、检索、迁移辅助）
 - `assets/resource-pack.json` — 图标资源包索引
 - `assets/icons/` — 默认应用图标与 favicon
-- `prompt-data.json` — 本地提示数据（已加入 `.gitignore`，不随仓库提交）
+- `data.sqlite` — SQLite 主数据库（默认不提交）
 - `package.json` — 依赖与启动脚本
 - `start-windows.bat` — 便于在 Windows 下启动
 
@@ -32,7 +33,11 @@
 3. 打开浏览器访问 `http://localhost:3000`（端口以 `server.js` 配置为准）
 
 后端 API（SQLite 架构）
+- `GET /api/auth/github/start`：跳转到 GitHub 授权页
+- `GET /api/auth/github/callback`：GitHub 回调并签发本地 access/refresh token
+- `POST /api/auth/refresh`：刷新 access token（并轮换 refresh token）
 - `GET /api/prompts`：读取完整提示词数据库（由 SQLite 重建 JSON 结构）
+- `GET /api/prompts/export`：下载 `prompt-data.json` 格式导出（浏览器附件下载）
 - `POST /api/prompts/mutate`：执行后端业务变更（新增/编辑/删除）
 - `PUT /api/prompts`：全量覆盖写入（用于导入/同步）
 - `GET /api/characters`：读取角色列表
@@ -41,10 +46,35 @@
 - `DELETE /api/characters/:id`：删除角色
 - `GET /api/agent-skill/search`：关键词检索
 
+已弃用
+- `GET /api/chars` 已移除，请统一使用 `GET /api/characters`。
+
 说明
 - 数据主存储已切换为 `data.sqlite`（SQLite）。
 - 前端保持 Fetch API 调用，不直接读写本地 JSON。
 - 若已有 `data.json` 或 `prompt-data.json`，可执行迁移脚本导入 SQLite。
+- 所有业务数据均带 `owner_user_id`，业务查询默认按当前登录用户隔离。
+- `GET /api/prompts` 与 `GET /api/prompts/export` 支持未登录只读访问。
+- 写接口（如 `POST /api/prompts/mutate`、`PUT /api/prompts`）仍需 Bearer token。
+- 登录用户若首次无私有数据，会自动从公共模板初始化一份可编辑数据。
+- 本地账号注册/密码登录已禁用，仅允许 GitHub OAuth 登录。
+
+GitHub OAuth 配置
+1. 在 GitHub 创建 OAuth App。
+2. 回调地址设置为：`http://localhost:3000/api/auth/github/callback`（或你的端口）。
+3. 配置敏感信息（二选一）：
+	- 环境变量
+	- 或复制 `secrets.example.json` 为 `secrets.local.json` 后填写
+4. 必需配置项：
+	- `GITHUB_CLIENT_ID`
+	- `GITHUB_CLIENT_SECRET`
+	- `ACCESS_TOKEN_SECRET`
+	- 可选：`GITHUB_CALLBACK_URL`
+5. 打开页面后，在“个人信息”页点击“使用 GitHub 登录”。
+
+安全提醒
+- 不要把 `GITHUB_CLIENT_SECRET`、`ACCESS_TOKEN_SECRET` 提交到仓库。
+- `secrets.local.json`、`.env`、`.env.local` 已在 `.gitignore` 中忽略。
 
 SQLite 迁移
 1. 安装依赖：`npm install`

@@ -7,6 +7,14 @@ function renderAllTabs() {
     renderTab('outfit');
 }
 
+function getReadOnlyButtonAttr() {
+    return isReadOnlyMode ? ' disabled data-readonly="1" title="当前为只读模式，请先使用 GitHub 登录"' : '';
+}
+
+function getReadOnlyInputAttr() {
+    return isReadOnlyMode ? ' disabled data-readonly="1"' : '';
+}
+
 function renderTab(tabId) {
     const listNode = document.getElementById('list-' + tabId);
     const groups = promptData[tabId] || [];
@@ -21,21 +29,23 @@ function renderTab(tabId) {
     listNode.innerHTML = visibleGroups.map(group => {
         const itemsHtml = group.items.map(item => {
             const isEditing = !!editState && editState.tabId === tabId && editState.groupId === group.id && editState.itemId === item.id;
+            const readOnlyButtonAttr = getReadOnlyButtonAttr();
+            const readOnlyInputAttr = getReadOnlyInputAttr();
             const previewHtml = isEditing
-                ? '<div class="preview-box active"><div class="inline-item-form" data-inline-form="edit"><input class="inline-item-name" type="text" value="' + escapeAttr(item.name) + '" placeholder="条目名称" /><textarea class="inline-item-prompt" placeholder="提示词内容">' + escapeHtml(item.prompt) + '</textarea><div class="form-actions"><button class="copy-btn" data-action="edit-inline-save">保存</button><button class="copy-btn secondary-btn" data-action="edit-inline-cancel">取消</button></div></div></div>'
+                ? '<div class="preview-box active"><div class="inline-item-form" data-inline-form="edit"><input class="inline-item-name" type="text" value="' + escapeAttr(item.name) + '" placeholder="条目名称"' + readOnlyInputAttr + ' /><textarea class="inline-item-prompt" placeholder="提示词内容"' + readOnlyInputAttr + '>' + escapeHtml(item.prompt) + '</textarea><div class="form-actions"><button class="copy-btn" data-action="edit-inline-save"' + readOnlyButtonAttr + '>保存</button><button class="copy-btn secondary-btn" data-action="edit-inline-cancel">取消</button></div></div></div>'
                 : '<div class="preview-box">' + escapeHtml(item.prompt) + '</div>';
 
-            return '\n                        <div class="prompt-item" data-item-id="' + item.id + '" data-group-id="' + group.id + '" data-tab-id="' + tabId + '">\n                            <div class="prompt-main">\n                                <span class="prompt-name">' + escapeHtml(item.name) + '</span>\n                                <div class="prompt-actions">\n                                    <button class="copy-btn" data-action="copy" data-prompt="' + escapeAttr(item.prompt) + '">复制</button>\n                                    <button class="copy-btn secondary-btn" data-action="edit">编辑</button>\n                                    <button class="copy-btn secondary-btn" data-action="preview">预览</button>\n                                    <button class="copy-btn danger-btn" data-action="delete" data-item-name="' + escapeAttr(item.name) + '">删除</button>\n                                </div>\n                            </div>\n                            ' + previewHtml + '\n                        </div>\n                    ';
+            return '\n                        <div class="prompt-item" data-item-id="' + item.id + '" data-group-id="' + group.id + '" data-tab-id="' + tabId + '">\n                            <div class="prompt-main">\n                                <span class="prompt-name">' + escapeHtml(item.name) + '</span>\n                                <div class="prompt-actions">\n                                    <button class="copy-btn" data-action="copy" data-prompt="' + escapeAttr(item.prompt) + '">复制</button>\n                                    <button class="copy-btn secondary-btn" data-action="edit"' + readOnlyButtonAttr + '>编辑</button>\n                                    <button class="copy-btn secondary-btn" data-action="preview">预览</button>\n                                    <button class="copy-btn danger-btn" data-action="delete" data-item-name="' + escapeAttr(item.name) + '"' + readOnlyButtonAttr + '>删除</button>\n                                </div>\n                            </div>\n                            ' + previewHtml + '\n                        </div>\n                    ';
         }).join('');
 
         const content = itemsHtml || '<div class="hint-text">当前分组还没有提示词，使用上方表单新增。</div>';
-        const commonAddBtn = '<button class="copy-btn" data-action="add-item-start" data-tab-id="' + tabId + '" data-group-id="' + group.id + '">新增提示词</button>';
+        const commonAddBtn = '<button class="copy-btn" data-action="add-item-start" data-tab-id="' + tabId + '" data-group-id="' + group.id + '"' + getReadOnlyButtonAttr() + '>新增提示词</button>';
         const groupManageBtns = tabId === 'chars'
-            ? '<div class="group-settings-wrap"><button class="settings-icon-btn" data-action="open-char-settings-modal" data-group-id="' + group.id + '" data-group-title="' + escapeAttr(group.title) + '" aria-label="打开角色设置">⚙</button></div>'
+            ? '<div class="group-settings-wrap"><button class="settings-icon-btn" data-action="open-char-settings-modal" data-group-id="' + group.id + '" data-group-title="' + escapeAttr(group.title) + '" aria-label="打开角色设置"' + getReadOnlyButtonAttr() + '>⚙</button></div>'
             : '';
         const groupActionHtml = '<div class="group-actions">' + commonAddBtn + groupManageBtns + '</div>';
         const addFormHtml = (addState && addState.tabId === tabId && addState.groupId === group.id)
-            ? '<div class="inline-item-form" data-inline-form="add" data-tab-id="' + tabId + '" data-group-id="' + group.id + '"><input class="inline-item-name" type="text" placeholder="输入条目名称" /><textarea class="inline-item-prompt" placeholder="输入完整提示词"></textarea><div class="form-actions"><button class="copy-btn" data-action="add-item-save">保存新增</button><button class="copy-btn secondary-btn" data-action="add-item-cancel">取消</button></div></div>'
+            ? '<div class="inline-item-form" data-inline-form="add" data-tab-id="' + tabId + '" data-group-id="' + group.id + '"><input class="inline-item-name" type="text" placeholder="输入条目名称"' + getReadOnlyInputAttr() + ' /><textarea class="inline-item-prompt" placeholder="输入完整提示词"' + getReadOnlyInputAttr() + '></textarea><div class="form-actions"><button class="copy-btn" data-action="add-item-save"' + getReadOnlyButtonAttr() + '>保存新增</button><button class="copy-btn secondary-btn" data-action="add-item-cancel">取消</button></div></div>'
             : '';
         const tagsHtml = tabId === 'chars' ? renderCardTags(group.id, group.tags || []) : '';
 
@@ -64,24 +74,26 @@ function renderOutfitTab(listNode, groups) {
                     && editState.groupId === group.id
                     && editState.itemId === item.id
                     && editState.categoryKey === categoryKey;
+                const readOnlyButtonAttr = getReadOnlyButtonAttr();
+                const readOnlyInputAttr = getReadOnlyInputAttr();
                 const previewHtml = isEditing
-                    ? '<div class="preview-box active"><div class="inline-item-form" data-inline-form="edit"><input class="inline-item-name" type="text" value="' + escapeAttr(item.name) + '" placeholder="条目名称" /><textarea class="inline-item-prompt" placeholder="提示词内容">' + escapeHtml(item.prompt) + '</textarea><div class="form-actions"><button class="copy-btn" data-action="edit-inline-save">保存</button><button class="copy-btn secondary-btn" data-action="edit-inline-cancel">取消</button></div></div></div>'
+                    ? '<div class="preview-box active"><div class="inline-item-form" data-inline-form="edit"><input class="inline-item-name" type="text" value="' + escapeAttr(item.name) + '" placeholder="条目名称"' + readOnlyInputAttr + ' /><textarea class="inline-item-prompt" placeholder="提示词内容"' + readOnlyInputAttr + '>' + escapeHtml(item.prompt) + '</textarea><div class="form-actions"><button class="copy-btn" data-action="edit-inline-save"' + readOnlyButtonAttr + '>保存</button><button class="copy-btn secondary-btn" data-action="edit-inline-cancel">取消</button></div></div></div>'
                     : '<div class="preview-box">' + escapeHtml(item.prompt) + '</div>';
 
-                return '\n                    <div class="prompt-item" data-item-id="' + item.id + '" data-group-id="' + group.id + '" data-tab-id="outfit" data-category-key="' + categoryKey + '">\n                        <div class="prompt-main">\n                            <span class="prompt-name">' + escapeHtml(item.name) + '</span>\n                            <div class="prompt-actions">\n                                <button class="copy-btn" data-action="copy" data-prompt="' + escapeAttr(item.prompt) + '">复制</button>\n                                <button class="copy-btn secondary-btn" data-action="edit">编辑</button>\n                                <button class="copy-btn secondary-btn" data-action="preview">预览</button>\n                                <button class="copy-btn danger-btn" data-action="delete" data-item-name="' + escapeAttr(item.name) + '">删除</button>\n                            </div>\n                        </div>\n                        ' + previewHtml + '\n                    </div>\n                ';
+                return '\n                    <div class="prompt-item" data-item-id="' + item.id + '" data-group-id="' + group.id + '" data-tab-id="outfit" data-category-key="' + categoryKey + '">\n                        <div class="prompt-main">\n                            <span class="prompt-name">' + escapeHtml(item.name) + '</span>\n                            <div class="prompt-actions">\n                                <button class="copy-btn" data-action="copy" data-prompt="' + escapeAttr(item.prompt) + '">复制</button>\n                                <button class="copy-btn secondary-btn" data-action="edit"' + readOnlyButtonAttr + '>编辑</button>\n                                <button class="copy-btn secondary-btn" data-action="preview">预览</button>\n                                <button class="copy-btn danger-btn" data-action="delete" data-item-name="' + escapeAttr(item.name) + '"' + readOnlyButtonAttr + '>删除</button>\n                            </div>\n                        </div>\n                        ' + previewHtml + '\n                    </div>\n                ';
             }).join('');
 
             const addFormHtml = (addState
                 && addState.tabId === 'outfit'
                 && addState.groupId === group.id
                 && addState.categoryKey === categoryKey)
-                ? '<div class="inline-item-form" data-inline-form="add" data-tab-id="outfit" data-group-id="' + group.id + '" data-category-key="' + categoryKey + '"><input class="inline-item-name" type="text" placeholder="输入条目名称" /><textarea class="inline-item-prompt" placeholder="输入完整提示词"></textarea><div class="form-actions"><button class="copy-btn" data-action="add-item-save">保存新增</button><button class="copy-btn secondary-btn" data-action="add-item-cancel">取消</button></div></div>'
+                ? '<div class="inline-item-form" data-inline-form="add" data-tab-id="outfit" data-group-id="' + group.id + '" data-category-key="' + categoryKey + '"><input class="inline-item-name" type="text" placeholder="输入条目名称"' + getReadOnlyInputAttr() + ' /><textarea class="inline-item-prompt" placeholder="输入完整提示词"' + getReadOnlyInputAttr() + '></textarea><div class="form-actions"><button class="copy-btn" data-action="add-item-save"' + getReadOnlyButtonAttr() + '>保存新增</button><button class="copy-btn secondary-btn" data-action="add-item-cancel">取消</button></div></div>'
                 : '';
 
-            return '\n                <div class="outfit-section">\n                    <div class="outfit-section-title">' + OUTFIT_CATEGORY_LABELS[categoryKey] + '</div>\n                    ' + (itemsHtml || '<div class="hint-text">当前分类暂无提示词。</div>') + '\n                    <div class="group-actions"><button class="copy-btn" data-action="add-outfit-item-start" data-tab-id="outfit" data-group-id="' + group.id + '" data-category-key="' + categoryKey + '">新增' + OUTFIT_CATEGORY_LABELS[categoryKey] + '</button></div>\n                    ' + addFormHtml + '\n                </div>\n            ';
+            return '\n                <div class="outfit-section">\n                    <div class="outfit-section-title">' + OUTFIT_CATEGORY_LABELS[categoryKey] + '</div>\n                    ' + (itemsHtml || '<div class="hint-text">当前分类暂无提示词。</div>') + '\n                    <div class="group-actions"><button class="copy-btn" data-action="add-outfit-item-start" data-tab-id="outfit" data-group-id="' + group.id + '" data-category-key="' + categoryKey + '"' + getReadOnlyButtonAttr() + '>新增' + OUTFIT_CATEGORY_LABELS[categoryKey] + '</button></div>\n                    ' + addFormHtml + '\n                </div>\n            ';
         }).join('');
 
-        return '\n            <div class="card">\n                <div class="card-header">\n                    <div class="card-title">' + escapeHtml(group.title) + '</div>\n                    <div class="group-actions">\n                        <button class="copy-btn secondary-btn" data-action="rename-outfit-group" data-group-id="' + group.id + '" data-group-title="' + escapeAttr(group.title) + '">编辑风格名</button>\n                        <button class="copy-btn danger-btn" data-action="delete-outfit-group" data-group-id="' + group.id + '" data-group-title="' + escapeAttr(group.title) + '">删除风格</button>\n                    </div>\n                </div>\n                ' + categoryBlocks + '\n            </div>\n        ';
+        return '\n            <div class="card">\n                <div class="card-header">\n                    <div class="card-title">' + escapeHtml(group.title) + '</div>\n                    <div class="group-actions">\n                        <button class="copy-btn secondary-btn" data-action="rename-outfit-group" data-group-id="' + group.id + '" data-group-title="' + escapeAttr(group.title) + '"' + getReadOnlyButtonAttr() + '>编辑风格名</button>\n                        <button class="copy-btn danger-btn" data-action="delete-outfit-group" data-group-id="' + group.id + '" data-group-title="' + escapeAttr(group.title) + '"' + getReadOnlyButtonAttr() + '>删除风格</button>\n                    </div>\n                </div>\n                ' + categoryBlocks + '\n            </div>\n        ';
     }).join('');
 
     if (!groups.length) {
@@ -278,17 +290,17 @@ function renderCardTags(groupId, tags) {
             && activeCharTagEditor.oldTag === tag;
 
         if (isEditing) {
-            return '<div class="char-tag-edit-wrap"><input class="card-tag card-tag-edit-input" data-action="char-tag-edit-input" data-group-id="' + escapeAttr(groupId) + '" data-old-tag="' + escapeAttr(tag) + '" value="' + escapeAttr(activeCharTagEditor.value || '') + '" /><button class="char-tag-delete-x" data-action="delete-char-tag-inline" data-group-id="' + escapeAttr(groupId) + '" data-tag="' + escapeAttr(tag) + '" aria-label="删除标签">×</button></div>';
+            return '<div class="char-tag-edit-wrap"><input class="card-tag card-tag-edit-input" data-action="char-tag-edit-input" data-group-id="' + escapeAttr(groupId) + '" data-old-tag="' + escapeAttr(tag) + '" value="' + escapeAttr(activeCharTagEditor.value || '') + '"' + getReadOnlyInputAttr() + ' /><button class="char-tag-delete-x" data-action="delete-char-tag-inline" data-group-id="' + escapeAttr(groupId) + '" data-tag="' + escapeAttr(tag) + '" aria-label="删除标签"' + getReadOnlyButtonAttr() + '>×</button></div>';
         }
 
-        return '<button class="card-tag card-tag-btn" data-action="start-char-tag-edit" data-group-id="' + escapeAttr(groupId) + '" data-tag="' + escapeAttr(tag) + '">' + escapeHtml(label) + '</button>';
+        return '<button class="card-tag card-tag-btn" data-action="start-char-tag-edit" data-group-id="' + escapeAttr(groupId) + '" data-tag="' + escapeAttr(tag) + '"' + getReadOnlyButtonAttr() + '>' + escapeHtml(label) + '</button>';
     }).join('');
 
     const isAdding = !!activeCharTagEditor && activeCharTagEditor.groupId === groupId && activeCharTagEditor.isNew;
     const addEditor = isAdding
-        ? '<div class="char-tag-edit-wrap"><input class="card-tag card-tag-edit-input" data-action="char-tag-edit-input" data-group-id="' + escapeAttr(groupId) + '" data-old-tag="" value="' + escapeAttr(activeCharTagEditor.value || '') + '" placeholder="输入新标签" /></div>'
+        ? '<div class="char-tag-edit-wrap"><input class="card-tag card-tag-edit-input" data-action="char-tag-edit-input" data-group-id="' + escapeAttr(groupId) + '" data-old-tag="" value="' + escapeAttr(activeCharTagEditor.value || '') + '" placeholder="输入新标签"' + getReadOnlyInputAttr() + ' /></div>'
         : '';
-    const addBtn = '<button class="card-tag card-tag-btn add-tag-btn" data-action="start-char-tag-add" data-group-id="' + escapeAttr(groupId) + '" aria-label="新增标签">+</button>';
+    const addBtn = '<button class="card-tag card-tag-btn add-tag-btn" data-action="start-char-tag-add" data-group-id="' + escapeAttr(groupId) + '" aria-label="新增标签"' + getReadOnlyButtonAttr() + '>+</button>';
     return '<div class="card-tags">' + chips + addEditor + addBtn + '</div>';
 }
 

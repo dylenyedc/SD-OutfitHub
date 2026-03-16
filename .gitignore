@@ -1,1 +1,27 @@
+node_modules/
+
+# SQLite runtime files
+data.sqlite
+data.sqlite-shm
+data.sqlite-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Legacy/optional JSON import sources
+data.json
 prompt-data.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+
+# Local secrets
+secrets.local.json
+secrets.*.json
+!secrets.example.json
+.env
+.env.local
+.env.*
+!.env.example

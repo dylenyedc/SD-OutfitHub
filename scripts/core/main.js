@@ -1,4 +1,6 @@
 async function init() {
+    consumeAuthTokensFromUrlHash();
+    initAuthUI();
     promptData = await loadPromptData();
     renderAllTabs();
     bindListEvents();
@@ -7,6 +9,85 @@ async function init() {
     bindTagFilterEvents();
     bindCharSettingsModalEvents();
     initSidebarNavigation();
+    updateReadOnlyUI();
+
+    if (isReadOnlyMode) {
+        showToast('当前为只读模式，登录后可修改数据');
+    }
+}
+
+function initAuthUI() {
+    const status = document.getElementById('auth-status-text');
+    const loginBtn = document.getElementById('github-login-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+    const exportBtn = document.getElementById('export-prompts-btn');
+    const updateStatus = function () {
+        if (!status) {
+            return;
+        }
+        if (hasAuthSession() && !isReadOnlyMode) {
+            status.textContent = '当前已登录（GitHub，可编辑）';
+            return;
+        }
+        status.textContent = '当前未登录（只读模式）';
+    };
+
+    updateStatus();
+
+    if (loginBtn) {
+        loginBtn.addEventListener('click', function () {
+            authLoginWithGitHub(window.location.pathname || '/');
+        });
+    }
+
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', function () {
+            authLogout();
+            if (typeof setReadOnlyMode === 'function') {
+                setReadOnlyMode(true);
+            }
+            updateStatus();
+            showToast('已退出登录');
+            window.location.reload();
+        });
+    }
+
+    if (exportBtn) {
+        exportBtn.addEventListener('click', async function () {
+            await downloadPromptDataExport();
+        });
+    }
+
+    window.updateReadOnlyUI = function () {
+        const tip = document.getElementById('readonly-mode-tip');
+        if (tip) {
+            tip.textContent = isReadOnlyMode
+                ? '当前为只读模式：可浏览数据，登录后才能新增、编辑、删除。'
+                : '当前为编辑模式：你可以新增、编辑、删除自己的数据。';
+        }
+
+        document.body.classList.toggle('is-readonly-mode', isReadOnlyMode);
+
+        [
+            'char-group-title-input',
+            'char-group-add-btn',
+            'outfit-group-title-input',
+            'outfit-group-add-btn',
+            'char-settings-edit-tags-btn',
+            'char-settings-rename-btn',
+            'char-settings-delete-btn',
+            'char-settings-editor-input',
+            'char-settings-editor-textarea',
+            'char-settings-editor-save-btn'
+        ].forEach(function (id) {
+            const node = document.getElementById(id);
+            if (node) {
+                node.disabled = !!isReadOnlyMode;
+            }
+        });
+
+        updateStatus();
+    };
 }
 
 function initSidebarNavigation() {
