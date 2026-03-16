@@ -4,9 +4,11 @@
   "private": true,
   "description": "SD-OutfitHub - 本地 Stable Diffusion 服装提示词管理与检索工具",
   "dependencies": {
+    "better-sqlite3": "^11.10.0",
     "express": "^4.21.2"
   },
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "migrate:sqlite": "node scripts/migrate-json-to-sqlite.js"
   }
 }

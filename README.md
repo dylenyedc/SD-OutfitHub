@@ -31,15 +31,25 @@
 2. 启动：`npm start` 或 双击 `start-windows.bat`
 3. 打开浏览器访问 `http://localhost:3000`（端口以 `server.js` 配置为准）
 
-后端 API（当前架构）
-- `GET /api/prompts`：读取完整提示词数据库
+后端 API（SQLite 架构）
+- `GET /api/prompts`：读取完整提示词数据库（由 SQLite 重建 JSON 结构）
 - `POST /api/prompts/mutate`：执行后端业务变更（新增/编辑/删除）
-- `PUT /api/prompts`：兼容全量覆盖保存（保留）
+- `PUT /api/prompts`：全量覆盖写入（用于导入/同步）
+- `GET /api/characters`：读取角色列表
+- `POST /api/characters`：创建角色
+- `PUT /api/characters/:id`：更新角色
+- `DELETE /api/characters/:id`：删除角色
 - `GET /api/agent-skill/search`：关键词检索
 
 说明
-- 现在数据写操作统一在 Express 后端执行，前端不再直接“本地改对象再写文件”。
-- 前端通过 Fetch 调用后端变更接口，后端完成校验、落盘并返回最新数据快照。
+- 数据主存储已切换为 `data.sqlite`（SQLite）。
+- 前端保持 Fetch API 调用，不直接读写本地 JSON。
+- 若已有 `data.json` 或 `prompt-data.json`，可执行迁移脚本导入 SQLite。
+
+SQLite 迁移
+1. 安装依赖：`npm install`
+2. 执行迁移：`npm run migrate:sqlite`
+3. 启动服务：`npm start`
 
 Agent Skill（关键词检索提示词）
 - 接口：`GET /api/agent-skill/search`
