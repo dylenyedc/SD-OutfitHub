@@ -9,6 +9,6 @@
   },
   "scripts": {
     "start": "node server.js",
-    "migrate:sqlite": "node scripts/migrate-json-to-sqlite.js"
+    "migrate:sqlite": "node scripts/legacy/migrate-json-to-sqlite.js"
   }
 }

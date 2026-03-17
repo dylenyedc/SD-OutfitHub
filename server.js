@@ -3,7 +3,6 @@ const path = require('path');
 const crypto = require('crypto');
 const express = require('express');
 const {
-  OUTFIT_CATEGORY_KEYS,
   newId,
   parseTags,
   normalizePromptData,
@@ -70,6 +69,21 @@ function optionalTrimmedString(value) {
     return '';
   }
   return String(value).trim();
+}
+
+function normalizeOutfitPart(value) {
+  const text = optionalTrimmedString(value);
+  return text || '未知';
+}
+
+function normalizeOutfitSourceCharacter(value) {
+  const text = optionalTrimmedString(value);
+  return text || '无';
+}
+
+function normalizeOutfitSafety(value) {
+  const text = optionalTrimmedString(value).toUpperCase();
+  return text === 'NSFW' ? 'NSFW' : 'SFW';
 }
 
 function resolveDisplayName(user) {
@@ -346,12 +360,9 @@ function clonePromptDataWithFreshIds(data) {
     chars: normalized.chars.map(group => ({
       id: newId(),
       title: group.title,
+      description: optionalTrimmedString(group.description),
       tags: Array.isArray(group.tags) ? [...group.tags] : [],
-      items: (Array.isArray(group.items) ? group.items : []).map(item => ({
-        id: newId(),
-        name: item.name,
-        prompt: item.prompt
-      }))
+      items: []
     })),
     actions: normalized.actions.map(group => ({
       id: newId(),
@@ -371,32 +382,22 @@ function clonePromptDataWithFreshIds(data) {
         prompt: item.prompt
       }))
     })),
-    outfit: normalized.outfit.map(group => {
-      const nextGroup = {
-        id: newId(),
-        title: group.title
-      };
-
-      OUTFIT_CATEGORY_KEYS.forEach(categoryKey => {
-        const items = Array.isArray(group[categoryKey]) ? group[categoryKey] : [];
-        nextGroup[categoryKey] = items.map(item => ({
-          id: newId(),
-          name: item.name,
-          prompt: item.prompt
-        }));
-      });
-
-      return nextGroup;
-    })
+    outfit: normalized.outfit.map(entry => ({
+      id: newId(),
+      title: optionalTrimmedString(entry.title) || '未命名服装',
+      part: normalizeOutfitPart(entry.part),
+      style: optionalTrimmedString(entry.style),
+      sourceCharacter: normalizeOutfitSourceCharacter(entry.sourceCharacter || entry.source_character),
+      safety: normalizeOutfitSafety(entry.safety),
+      other: optionalTrimmedString(entry.other || entry.otherTags || entry.other_tags),
+      prompt: optionalTrimmedString(entry.prompt)
+    }))
   };
 }
 
 function findPromptGroupTable(section) {
   if (section === 'actions' || section === 'env') {
     return 'prompt_groups';
-  }
-  if (section === 'chars') {
-    return 'characters';
   }
   if (section === 'outfit') {
     return 'outfits';
@@ -421,18 +422,41 @@ function mutateByAction(actorUser, action, payload = {}) {
       if (existed) {
         throw new Error('该角色分组已存在');
       }
-      db.prepare('INSERT INTO characters(id, owner_user_id, title, tags_json) VALUES (?, ?, ?, ?)').run(newId(), actor.id, title, '[]');
+      db.prepare('INSERT INTO characters(id, owner_user_id, title, description, tags_json) VALUES (?, ?, ?, ?, ?)').run(newId(), actor.id, title, '', '[]');
       return '已新增角色分组';
     }
 
-    if (action === 'addOutfitGroup') {
-      const title = requireString(payload.title, '请输入服装风格名称');
-      const existed = db.prepare('SELECT 1 FROM outfits WHERE owner_user_id = ? AND title = ?').get(actor.id, title);
-      if (existed) {
-        throw new Error('该服装风格已存在');
+    if (action === 'saveCharDescription') {
+      const groupId = requireString(payload.groupId, '角色分组不存在');
+      const description = requireString(payload.description, '角色描述不能为空');
+      const existed = db.prepare('SELECT owner_user_id FROM characters WHERE id = ?').get(groupId);
+      if (!existed) {
+        throw new Error('角色分组不存在');
       }
-      db.prepare('INSERT INTO outfits(id, owner_user_id, title) VALUES (?, ?, ?)').run(newId(), actor.id, title);
-      return '已新增服装风格';
+      ensureCanManageOwner(actor, existed.owner_user_id);
+      db.prepare('UPDATE characters SET description = ? WHERE owner_user_id = ? AND id = ?').run(description, existed.owner_user_id, groupId);
+      return '角色描述已更新';
+    }
+
+    if (action === 'addOutfitGroup') {
+      const title = requireString(payload.title, '请输入服装名称');
+      db.prepare('INSERT INTO outfits(id, owner_user_id, title, part, style, source_character, safety, other_tags, prompt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(newId(), actor.id, title, '未知', '', '无', 'SFW', '', '');
+      return '已新增服装条目';
+    }
+
+    if (action === 'addOutfitEntry') {
+      const title = requireString(payload.title, '请输入服装条目名称');
+      const part = normalizeOutfitPart(payload.part);
+      const style = optionalTrimmedString(payload.style);
+      const sourceCharacter = normalizeOutfitSourceCharacter(payload.sourceCharacter);
+      const safety = normalizeOutfitSafety(payload.safety);
+      const other = optionalTrimmedString(payload.other);
+      const prompt = requireString(payload.prompt, '请填写提示词内容');
+
+      db.prepare('INSERT INTO outfits(id, owner_user_id, title, part, style, source_character, safety, other_tags, prompt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(newId(), actor.id, title, part, style, sourceCharacter, safety, other, prompt);
+      return '已新增服装条目';
     }
 
     if (action === 'editCharGroupTags') {
@@ -551,7 +575,7 @@ function mutateByAction(actorUser, action, payload = {}) {
 
     if (action === 'deleteItem') {
       const tabId = requireString(payload.tabId, '分组类型无效');
-      if (!['chars', 'actions', 'env'].includes(tabId)) {
+      if (!['actions', 'env'].includes(tabId)) {
         throw new Error('分组类型无效');
       }
       const groupId = requireString(payload.groupId, '未找到所属分组');
@@ -574,13 +598,7 @@ function mutateByAction(actorUser, action, payload = {}) {
       const itemId = requireString(payload.itemId, '条目不存在，可能已被删除');
       const name = requireString(payload.name, '请填写完整信息');
       const prompt = requireString(payload.prompt, '请填写完整信息');
-      const categoryKey = String(payload.categoryKey || '');
-
-      if (tabId === 'outfit') {
-        if (!OUTFIT_CATEGORY_KEYS.includes(categoryKey)) {
-          throw new Error('服装分类无效');
-        }
-      } else if (!['chars', 'actions', 'env'].includes(tabId)) {
+      if (!['actions', 'env'].includes(tabId)) {
         throw new Error('分组类型无效');
       }
 
@@ -603,14 +621,7 @@ function mutateByAction(actorUser, action, payload = {}) {
       const groupId = requireString(payload.groupId, '未找到分组');
       const name = requireString(payload.name, '请填写完整信息');
       const prompt = requireString(payload.prompt, '请填写完整信息');
-      let categoryKey = '';
-
-      if (tabId === 'outfit') {
-        categoryKey = requireString(payload.categoryKey, '服装分类无效');
-        if (!OUTFIT_CATEGORY_KEYS.includes(categoryKey)) {
-          throw new Error('服装分类无效');
-        }
-      } else if (!['chars', 'actions', 'env'].includes(tabId)) {
+      if (!['actions', 'env'].includes(tabId)) {
         throw new Error('分组类型无效');
       }
 
@@ -622,8 +633,44 @@ function mutateByAction(actorUser, action, payload = {}) {
       ensureCanManageOwner(actor, groupExists.owner_user_id);
 
       db.prepare('INSERT INTO prompts(id, owner_user_id, section, group_id, category_key, name, prompt) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .run(newId(), groupExists.owner_user_id, tabId, groupId, categoryKey, name, prompt);
+        .run(newId(), groupExists.owner_user_id, tabId, groupId, '', name, prompt);
       return '已新增提示词条目';
+    }
+
+    if (action === 'saveOutfitEntry') {
+      const outfitId = requireString(payload.outfitId, '服装条目不存在');
+      const title = requireString(payload.title, '请输入服装条目名称');
+      const part = normalizeOutfitPart(payload.part);
+      const style = optionalTrimmedString(payload.style);
+      const sourceCharacter = normalizeOutfitSourceCharacter(payload.sourceCharacter);
+      const safety = normalizeOutfitSafety(payload.safety);
+      const other = optionalTrimmedString(payload.other);
+      const prompt = requireString(payload.prompt, '请填写提示词内容');
+
+      const existed = db.prepare('SELECT owner_user_id FROM outfits WHERE id = ?').get(outfitId);
+      if (!existed) {
+        throw new Error('服装条目不存在');
+      }
+      ensureCanManageOwner(actor, existed.owner_user_id);
+
+      const updated = db.prepare('UPDATE outfits SET title = ?, part = ?, style = ?, source_character = ?, safety = ?, other_tags = ?, prompt = ? WHERE owner_user_id = ? AND id = ?')
+        .run(title, part, style, sourceCharacter, safety, other, prompt, existed.owner_user_id, outfitId);
+      if (!updated.changes) {
+        throw new Error('服装条目不存在');
+      }
+      return '服装条目已更新';
+    }
+
+    if (action === 'deleteOutfitEntry') {
+      const outfitId = requireString(payload.outfitId, '服装条目不存在');
+      const existed = db.prepare('SELECT owner_user_id FROM outfits WHERE id = ?').get(outfitId);
+      if (!existed) {
+        throw new Error('服装条目不存在');
+      }
+      ensureCanManageOwner(actor, existed.owner_user_id);
+      db.prepare('DELETE FROM outfits WHERE owner_user_id = ? AND id = ?').run(existed.owner_user_id, outfitId);
+      db.prepare("DELETE FROM prompts WHERE owner_user_id = ? AND section = 'outfit' AND group_id = ?").run(existed.owner_user_id, outfitId);
+      return '服装条目已删除';
     }
 
     if (action === 'renameOutfitGroup') {
@@ -634,12 +681,8 @@ function mutateByAction(actorUser, action, payload = {}) {
         throw new Error('服装风格不存在');
       }
       ensureCanManageOwner(actor, existed.owner_user_id);
-      const duplicated = db.prepare('SELECT 1 FROM outfits WHERE owner_user_id = ? AND title = ? AND id <> ?').get(existed.owner_user_id, title, groupId);
-      if (duplicated) {
-        throw new Error('风格名称已存在');
-      }
       db.prepare('UPDATE outfits SET title = ? WHERE owner_user_id = ? AND id = ?').run(title, existed.owner_user_id, groupId);
-      return '风格名称已更新';
+      return '服装名称已更新';
     }
 
     if (action === 'deleteOutfitGroup') {
@@ -651,24 +694,18 @@ function mutateByAction(actorUser, action, payload = {}) {
       ensureCanManageOwner(actor, existed.owner_user_id);
       db.prepare("DELETE FROM prompts WHERE owner_user_id = ? AND section = 'outfit' AND group_id = ?").run(existed.owner_user_id, groupId);
       db.prepare('DELETE FROM outfits WHERE owner_user_id = ? AND id = ?').run(existed.owner_user_id, groupId);
-      return '服装风格已删除';
+      return '服装条目已删除';
     }
 
     if (action === 'deleteOutfitItem') {
-      const groupId = requireString(payload.groupId, '未找到所属风格或分类');
-      const categoryKey = requireString(payload.categoryKey, '服装分类无效');
       const itemId = requireString(payload.itemId, '条目不存在，无法删除');
-      if (!OUTFIT_CATEGORY_KEYS.includes(categoryKey)) {
-        throw new Error('服装分类无效');
-      }
-      const existed = db.prepare("SELECT owner_user_id FROM prompts WHERE id = ? AND section = 'outfit' AND group_id = ? AND category_key = ?")
-        .get(itemId, groupId, categoryKey);
+      const existed = db.prepare('SELECT owner_user_id FROM outfits WHERE id = ?').get(itemId);
       if (!existed) {
         throw new Error('条目不存在，无法删除');
       }
       ensureCanManageOwner(actor, existed.owner_user_id);
-      const removed = db.prepare("DELETE FROM prompts WHERE owner_user_id = ? AND id = ? AND section = 'outfit' AND group_id = ? AND category_key = ?")
-        .run(existed.owner_user_id, itemId, groupId, categoryKey);
+      const removed = db.prepare('DELETE FROM outfits WHERE owner_user_id = ? AND id = ?')
+        .run(existed.owner_user_id, itemId);
       if (!removed.changes) {
         throw new Error('条目不存在，无法删除');
       }

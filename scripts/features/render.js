@@ -1,6 +1,5 @@
 function renderAllTabs() {
     renderCharTagFilters();
-    renderOutfitCategoryFilters();
     renderTab('chars');
     renderTab('actions');
     renderTab('env');
@@ -32,16 +31,77 @@ function getReadOnlyInputAttr(ownerUserId) {
     return deniedReason ? ' disabled data-readonly="1"' : '';
 }
 
+function formatOutfitDisplayName(entry) {
+    const title = String(entry && entry.title ? entry.title : '未命名服装').trim() || '未命名服装';
+    const sourceCharacter = String(entry && entry.sourceCharacter ? entry.sourceCharacter : '').trim();
+    if (!sourceCharacter || sourceCharacter === '无') {
+        return title;
+    }
+    return title + '（' + sourceCharacter + '）';
+}
+
+function renderOutfitPromptItem(entry, showMeta) {
+    const ownerUserId = entry.ownerUserId || '';
+    const readOnlyButtonAttr = getReadOnlyButtonAttr(ownerUserId);
+    const readOnlyInputAttr = getReadOnlyInputAttr(ownerUserId);
+    const isEditing = !!editState && editState.tabId === 'outfit' && editState.itemId === entry.id;
+    const partText = String(entry.part || '').trim() || '未知';
+    const styleText = String(entry.style || '').trim() || '无';
+    const sourceText = String(entry.sourceCharacter || '').trim() || '无';
+    const safetyText = String(entry.safety || 'SFW').trim().toUpperCase() === 'NSFW' ? 'NSFW' : 'SFW';
+    const otherText = String(entry.other || '').trim() || '无';
+    const previewHtml = isEditing
+        ? '<div class="preview-box active"><div class="inline-item-form outfit-edit-form" data-inline-form="edit">'
+            + '<input class="inline-item-name" type="text" value="' + escapeAttr(entry.title || '') + '" placeholder="条目名称"' + readOnlyInputAttr + ' />'
+            + '<select class="inline-outfit-part"' + readOnlyInputAttr + '>' + OUTFIT_PART_OPTIONS.map(function (option) { return '<option value="' + escapeAttr(option) + '"' + (option === partText ? ' selected' : '') + '>' + escapeHtml(option) + '</option>'; }).join('') + '</select>'
+            + '<input class="inline-outfit-style" type="text" value="' + escapeAttr(entry.style || '') + '" placeholder="风格"' + readOnlyInputAttr + ' />'
+            + '<input class="inline-outfit-source" type="text" value="' + escapeAttr(sourceText) + '" placeholder="来源角色（没有请填无）"' + readOnlyInputAttr + ' />'
+            + '<select class="inline-outfit-safety"' + readOnlyInputAttr + '><option value="SFW"' + (safetyText === 'SFW' ? ' selected' : '') + '>SFW</option><option value="NSFW"' + (safetyText === 'NSFW' ? ' selected' : '') + '>NSFW</option></select>'
+            + '<input class="inline-outfit-other" type="text" value="' + escapeAttr(entry.other || '') + '" placeholder="其他标签"' + readOnlyInputAttr + ' />'
+            + '<textarea class="inline-item-prompt" placeholder="提示词内容"' + readOnlyInputAttr + '>' + escapeHtml(entry.prompt || '') + '</textarea>'
+            + '<div class="form-actions"><button class="copy-btn" data-action="edit-inline-save"' + readOnlyButtonAttr + '>保存</button><button class="copy-btn secondary-btn" data-action="edit-inline-cancel">取消</button></div>'
+            + '</div></div>'
+        : '<div class="preview-box">' + escapeHtml(entry.prompt || '') + '</div>';
+    const metaHtml = showMeta
+        ? '<div class="outfit-meta-grid">'
+            + '<div class="outfit-meta-item"><span class="outfit-meta-label">部位</span><span class="outfit-meta-value">' + escapeHtml(partText) + '</span></div>'
+            + '<div class="outfit-meta-item"><span class="outfit-meta-label">风格</span><span class="outfit-meta-value">' + escapeHtml(styleText) + '</span></div>'
+            + '<div class="outfit-meta-item"><span class="outfit-meta-label">来源角色</span><span class="outfit-meta-value">' + escapeHtml(sourceText) + '</span></div>'
+            + '<div class="outfit-meta-item"><span class="outfit-meta-label">安全性</span><span class="outfit-meta-value">' + escapeHtml(safetyText) + '</span></div>'
+            + '<div class="outfit-meta-item outfit-meta-item-wide"><span class="outfit-meta-label">其他</span><span class="outfit-meta-value">' + escapeHtml(otherText) + '</span></div>'
+            + '</div>'
+        : '';
+
+    return '<div class="prompt-item" data-item-id="' + entry.id + '" data-group-id="' + entry.id + '" data-tab-id="outfit">'
+        + '<div class="prompt-main">'
+        + '<span class="prompt-name">' + escapeHtml(formatOutfitDisplayName(entry)) + '</span>'
+        + '<div class="prompt-actions">'
+        + '<button class="copy-btn" data-action="copy" data-prompt="' + escapeAttr(entry.prompt || '') + '">复制</button>'
+        + '<button class="copy-btn secondary-btn" data-action="edit"' + readOnlyButtonAttr + '>编辑</button>'
+        + '<button class="copy-btn secondary-btn" data-action="preview">预览</button>'
+        + '<button class="copy-btn danger-btn" data-action="delete" data-item-name="' + escapeAttr(formatOutfitDisplayName(entry)) + '"' + readOnlyButtonAttr + '>删除</button>'
+        + '</div></div>'
+        + metaHtml
+        + previewHtml
+        + '</div>';
+}
+
 function renderTab(tabId) {
     const listNode = document.getElementById('list-' + tabId);
     const groups = promptData[tabId] || [];
+
+    if (tabId === 'chars') {
+        const visibleGroups = getVisibleCharGroups(groups);
+        renderCharsTab(listNode, groups, visibleGroups);
+        return;
+    }
 
     if (tabId === 'outfit') {
         renderOutfitTab(listNode, groups);
         return;
     }
 
-    const visibleGroups = tabId === 'chars' ? getVisibleCharGroups(groups) : groups;
+    const visibleGroups = groups;
 
     listNode.innerHTML = visibleGroups.map(group => {
         const groupOwnerUserId = group.ownerUserId || '';
@@ -61,19 +121,13 @@ function renderTab(tabId) {
         const groupReadOnlyButtonAttr = getReadOnlyButtonAttr(groupOwnerUserId);
         const groupReadOnlyInputAttr = getReadOnlyInputAttr(groupOwnerUserId);
         const commonAddBtn = '<button class="copy-btn" data-action="add-item-start" data-tab-id="' + tabId + '" data-group-id="' + group.id + '"' + groupReadOnlyButtonAttr + '>新增提示词</button>';
-        const groupManageBtns = tabId === 'chars'
-            ? '<div class="group-settings-wrap"><button class="settings-icon-btn" data-action="open-char-settings-modal" data-group-id="' + group.id + '" data-group-title="' + escapeAttr(group.title) + '" aria-label="打开角色设置"' + groupReadOnlyButtonAttr + '>⚙</button></div>'
-            : '';
+        const groupManageBtns = '';
         const groupActionHtml = '<div class="group-actions">' + commonAddBtn + groupManageBtns + '</div>';
         const addFormHtml = (addState && addState.tabId === tabId && addState.groupId === group.id)
             ? '<div class="inline-item-form" data-inline-form="add" data-tab-id="' + tabId + '" data-group-id="' + group.id + '"><input class="inline-item-name" type="text" placeholder="输入条目名称"' + groupReadOnlyInputAttr + ' /><textarea class="inline-item-prompt" placeholder="输入完整提示词"' + groupReadOnlyInputAttr + '></textarea><div class="form-actions"><button class="copy-btn" data-action="add-item-save"' + groupReadOnlyButtonAttr + '>保存新增</button><button class="copy-btn secondary-btn" data-action="add-item-cancel">取消</button></div></div>'
             : '';
-        const tagsHtml = tabId === 'chars' ? renderCardTags(group.id, group.tags || [], groupOwnerUserId) : '';
-        const uploaderHtml = tabId === 'chars'
-            ? '<div class="uploader-meta"><span class="hint-text">上传者：</span>'
-                + '<span class="uploader-avatar-fallback">' + escapeHtml(String(group.uploader || '匿').slice(0, 1).toUpperCase()) + '</span>'
-                + '<span class="uploader-name">' + escapeHtml(group.uploader || '匿名用户') + '</span></div>'
-            : '';
+        const tagsHtml = '';
+        const uploaderHtml = '';
         const titleHtml = '<div><div class="card-title">' + escapeHtml(group.title) + '</div>' + uploaderHtml + '</div>';
 
         return '\n                    <div class="card">\n                        <div class="card-header">\n                            ' + titleHtml + '\n                            ' + groupActionHtml + '\n                        </div>\n                        ' + tagsHtml + '\n                        ' + content + '\n                        ' + addFormHtml + '\n                    </div>\n                ';
@@ -84,73 +138,64 @@ function renderTab(tabId) {
         return;
     }
 
-    if (tabId === 'chars' && !visibleGroups.length) {
-        listNode.innerHTML = '<div class="card"><div class="hint-text">当前筛选条件下没有角色，试试清空关键词或切换标签。</div></div>';
-    }
 }
 
-function renderOutfitTab(listNode, groups) {
-    const visibleCategoryKeys = getVisibleOutfitCategoryKeys();
-
-    listNode.innerHTML = groups.map(function (group) {
-        const groupOwnerUserId = group.ownerUserId || '';
-        const groupReadOnlyButtonAttr = getReadOnlyButtonAttr(groupOwnerUserId);
-        const groupReadOnlyInputAttr = getReadOnlyInputAttr(groupOwnerUserId);
-        const categoryBlocks = visibleCategoryKeys.map(function (categoryKey) {
-            const items = Array.isArray(group[categoryKey]) ? group[categoryKey] : [];
-            const itemsHtml = items.map(function (item) {
-                const isEditing = !!editState
-                    && editState.tabId === 'outfit'
-                    && editState.groupId === group.id
-                    && editState.itemId === item.id
-                    && editState.categoryKey === categoryKey;
-                const itemOwnerUserId = item.ownerUserId || groupOwnerUserId;
-                const readOnlyButtonAttr = getReadOnlyButtonAttr(itemOwnerUserId);
-                const readOnlyInputAttr = getReadOnlyInputAttr(itemOwnerUserId);
-                const previewHtml = isEditing
-                    ? '<div class="preview-box active"><div class="inline-item-form" data-inline-form="edit"><input class="inline-item-name" type="text" value="' + escapeAttr(item.name) + '" placeholder="条目名称"' + readOnlyInputAttr + ' /><textarea class="inline-item-prompt" placeholder="提示词内容"' + readOnlyInputAttr + '>' + escapeHtml(item.prompt) + '</textarea><div class="form-actions"><button class="copy-btn" data-action="edit-inline-save"' + readOnlyButtonAttr + '>保存</button><button class="copy-btn secondary-btn" data-action="edit-inline-cancel">取消</button></div></div></div>'
-                    : '<div class="preview-box">' + escapeHtml(item.prompt) + '</div>';
-
-                return '\n                    <div class="prompt-item" data-item-id="' + item.id + '" data-group-id="' + group.id + '" data-tab-id="outfit" data-category-key="' + categoryKey + '">\n                        <div class="prompt-main">\n                            <span class="prompt-name">' + escapeHtml(item.name) + '</span>\n                            <div class="prompt-actions">\n                                <button class="copy-btn" data-action="copy" data-prompt="' + escapeAttr(item.prompt) + '">复制</button>\n                                <button class="copy-btn secondary-btn" data-action="edit"' + readOnlyButtonAttr + '>编辑</button>\n                                <button class="copy-btn secondary-btn" data-action="preview">预览</button>\n                                <button class="copy-btn danger-btn" data-action="delete" data-item-name="' + escapeAttr(item.name) + '"' + readOnlyButtonAttr + '>删除</button>\n                            </div>\n                        </div>\n                        ' + previewHtml + '\n                    </div>\n                ';
-            }).join('');
-
-            const addFormHtml = (addState
-                && addState.tabId === 'outfit'
-                && addState.groupId === group.id
-                && addState.categoryKey === categoryKey)
-                ? '<div class="inline-item-form" data-inline-form="add" data-tab-id="outfit" data-group-id="' + group.id + '" data-category-key="' + categoryKey + '"><input class="inline-item-name" type="text" placeholder="输入条目名称"' + groupReadOnlyInputAttr + ' /><textarea class="inline-item-prompt" placeholder="输入完整提示词"' + groupReadOnlyInputAttr + '></textarea><div class="form-actions"><button class="copy-btn" data-action="add-item-save"' + groupReadOnlyButtonAttr + '>保存新增</button><button class="copy-btn secondary-btn" data-action="add-item-cancel">取消</button></div></div>'
-                : '';
-
-            return '\n                <div class="outfit-section">\n                    <div class="outfit-section-title">' + OUTFIT_CATEGORY_LABELS[categoryKey] + '</div>\n                    ' + (itemsHtml || '<div class="hint-text">当前分类暂无提示词。</div>') + '\n                    <div class="group-actions"><button class="copy-btn" data-action="add-outfit-item-start" data-tab-id="outfit" data-group-id="' + group.id + '" data-category-key="' + categoryKey + '"' + groupReadOnlyButtonAttr + '>新增' + OUTFIT_CATEGORY_LABELS[categoryKey] + '</button></div>\n                    ' + addFormHtml + '\n                </div>\n            ';
-        }).join('');
-
-        return '\n            <div class="card">\n                <div class="card-header">\n                    <div class="card-title">' + escapeHtml(group.title) + '</div>\n                    <div class="group-actions">\n                        <button class="copy-btn secondary-btn" data-action="rename-outfit-group" data-group-id="' + group.id + '" data-group-title="' + escapeAttr(group.title) + '"' + groupReadOnlyButtonAttr + '>编辑风格名</button>\n                        <button class="copy-btn danger-btn" data-action="delete-outfit-group" data-group-id="' + group.id + '" data-group-title="' + escapeAttr(group.title) + '"' + groupReadOnlyButtonAttr + '>删除风格</button>\n                    </div>\n                </div>\n                ' + categoryBlocks + '\n            </div>\n        ';
-    }).join('');
-
+function renderCharsTab(listNode, groups, visibleGroups) {
     if (!groups.length) {
-        listNode.innerHTML = '<div class="card"><div class="hint-text">当前暂无服装风格，请先新增风格。</div></div>';
-    }
-}
-
-function renderOutfitCategoryFilters() {
-    if (!outfitCategoryFilters) {
+        listNode.innerHTML = '<div class="card"><div class="hint-text">当前菜单暂无分组，请先新增分组。</div></div>';
         return;
     }
 
-    const allBtn = '<button class="tag-chip' + (activeOutfitCategory === '__all__' ? ' active' : '') + '" data-action="filter-outfit-category" data-category="__all__">全部分类</button>';
-    const categoryBtns = OUTFIT_CATEGORY_KEYS.map(function (categoryKey) {
-        const isActive = categoryKey === activeOutfitCategory;
-        return '<button class="tag-chip' + (isActive ? ' active' : '') + '" data-action="filter-outfit-category" data-category="' + categoryKey + '">' + OUTFIT_CATEGORY_LABELS[categoryKey] + '</button>';
-    }).join('');
+    if (!visibleGroups.length) {
+        listNode.innerHTML = '<div class="card"><div class="hint-text">当前筛选条件下没有角色，试试清空关键词或切换标签。</div></div>';
+        return;
+    }
 
-    outfitCategoryFilters.innerHTML = allBtn + categoryBtns;
+    const outfitOptions = [{ id: '', title: '不拼接服装（仅角色特征）' }].concat((promptData.outfit || []).map(function (entry) {
+        return {
+            id: entry.id,
+            title: formatOutfitDisplayName(entry)
+        };
+    }));
+
+    listNode.innerHTML = visibleGroups.map(function (group) {
+        const ownerUserId = group.ownerUserId || '';
+        const readOnlyButtonAttr = getReadOnlyButtonAttr(ownerUserId);
+        const readOnlyInputAttr = getReadOnlyInputAttr(ownerUserId);
+        const tagsHtml = renderCardTags(group.id, group.tags || [], ownerUserId);
+        const uploaderHtml = '<div class="uploader-meta"><span class="hint-text">上传者：</span>'
+            + '<span class="uploader-avatar-fallback">' + escapeHtml(String(group.uploader || '匿').slice(0, 1).toUpperCase()) + '</span>'
+            + '<span class="uploader-name">' + escapeHtml(group.uploader || '匿名用户') + '</span></div>';
+        const outfitOptionsHtml = outfitOptions.map(function (option) {
+            return '<option value="' + escapeAttr(option.id) + '">' + escapeHtml(option.title) + '</option>';
+        }).join('');
+        const relatedOutfits = (promptData.outfit || []).filter(function (entry) {
+            return String(entry.sourceCharacter || '').trim() === String(group.title || '').trim();
+        });
+        const relatedOutfitsHtml = relatedOutfits.length
+            ? relatedOutfits.map(function (entry) {
+                return '<div class="outfit-related-item">' + renderOutfitPromptItem(entry, false) + '</div>';
+            }).join('')
+            : '<div class="hint-text">当前角色暂无关联服装条目。</div>';
+        const relatedOutfitSection = '<div class="editor-title" style="margin: 8px 0;">关联服装</div>'
+            + '<div class="char-related-outfit-list">' + relatedOutfitsHtml + '</div>';
+        const groupActionHtml = '<div class="group-actions">'
+            + '<button class="copy-btn" data-action="save-char-description" data-group-id="' + group.id + '"' + readOnlyButtonAttr + '>保存角色特征</button>'
+            + '<div class="group-settings-wrap"><button class="settings-icon-btn" data-action="open-char-settings-modal" data-group-id="' + group.id + '" data-group-title="' + escapeAttr(group.title) + '" aria-label="打开角色设置"' + readOnlyButtonAttr + '>⚙</button></div>'
+            + '</div>';
+
+        return '\n            <div class="card">\n                <div class="card-header">\n                    <div><div class="card-title">' + escapeHtml(group.title) + '</div>' + uploaderHtml + '</div>\n                    ' + groupActionHtml + '\n                </div>\n                ' + tagsHtml + '\n                <div class="inline-item-form" data-inline-form="char-description" data-group-id="' + group.id + '">\n                    <textarea class="inline-item-prompt" data-role="char-description-input" placeholder="输入角色自身描述（不含服装）"' + readOnlyInputAttr + '>' + escapeHtml(group.description || '') + '</textarea>\n                    <div class="form-actions">\n                        <button class="copy-btn" data-action="copy-char-base" data-group-id="' + group.id + '">复制角色特征</button>\n                    </div>\n                </div>\n                ' + relatedOutfitSection + '\n                <div class="inline-item-form" data-inline-form="char-copy-with-outfit" data-group-id="' + group.id + '">\n                    <select class="inline-outfit-select" data-role="char-outfit-select">' + outfitOptionsHtml + '</select>\n                    <div class="form-actions">\n                        <button class="copy-btn secondary-btn" data-action="copy-char-with-outfit" data-group-id="' + group.id + '">复制角色+服装</button>\n                    </div>\n                </div>\n            </div>\n        ';
+    }).join('');
 }
 
-function getVisibleOutfitCategoryKeys() {
-    if (activeOutfitCategory === '__all__') {
-        return OUTFIT_CATEGORY_KEYS;
+function renderOutfitTab(listNode, groups) {
+    listNode.innerHTML = groups.map(function (entry) {
+        return '\n            <div class="card outfit-card">\n                ' + renderOutfitPromptItem(entry, true) + '\n            </div>\n        ';
+    }).join('');
+
+    if (!groups.length) {
+        listNode.innerHTML = '<div class="card"><div class="hint-text">当前暂无服装条目，请先新增条目。</div></div>';
     }
-    return OUTFIT_CATEGORY_KEYS.indexOf(activeOutfitCategory) > -1 ? [activeOutfitCategory] : OUTFIT_CATEGORY_KEYS;
 }
 
 function renderCharTagFilters() {

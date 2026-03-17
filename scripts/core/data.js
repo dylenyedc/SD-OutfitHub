@@ -494,6 +494,7 @@ async function updateMyProfile(profileInput) {
 
 function normalizePromptData(data) {
     const normalized = deepClone(data || {});
+    const legacyCharOutfits = [];
     TAB_KEYS.forEach(function (tabKey) {
         if (!Array.isArray(normalized[tabKey])) {
             normalized[tabKey] = [];
@@ -512,28 +513,97 @@ function normalizePromptData(data) {
 
     normalized.chars = normalized.chars.map(function (group) {
         const nextGroup = group && typeof group === 'object' ? deepClone(group) : { id: newId(), title: '未命名角色', items: [] };
-        if (!Array.isArray(nextGroup.items)) {
-            nextGroup.items = [];
-        }
+        const legacyItems = Array.isArray(nextGroup.items) ? nextGroup.items : [];
+        nextGroup.items = [];
         if (!Array.isArray(nextGroup.tags)) {
             nextGroup.tags = [];
         }
-        return nextGroup;
-    });
+        const rawDescription = String(nextGroup.description || '').trim();
+        if (rawDescription) {
+            nextGroup.description = rawDescription;
+        } else {
+            const firstItem = legacyItems[0] || null;
+            nextGroup.description = firstItem && firstItem.prompt ? String(firstItem.prompt).trim() : '';
+        }
 
-    normalized.outfit = normalized.outfit.map(function (group) {
-        const nextGroup = group && typeof group === 'object'
-            ? deepClone(group)
-            : { id: newId(), title: '未命名风格', tops: [], bottoms: [], shoes: [] };
-
-        OUTFIT_CATEGORY_KEYS.forEach(function (categoryKey) {
-            if (!Array.isArray(nextGroup[categoryKey])) {
-                nextGroup[categoryKey] = [];
+        legacyItems.forEach(function (item) {
+            const promptText = String(item && item.prompt ? item.prompt : '').trim();
+            if (!promptText) {
+                return;
             }
+            legacyCharOutfits.push({
+                id: item.id || newId(),
+                title: String(item && item.name ? item.name : '未命名服装').trim() || '未命名服装',
+                part: '未知',
+                style: '',
+                sourceCharacter: String(nextGroup.title || '').trim() || '无',
+                safety: 'SFW',
+                other: '',
+                prompt: promptText
+            });
         });
 
         return nextGroup;
     });
+
+    function normalizeOutfitEntry(entry, fallbackStyle) {
+        const nextEntry = entry && typeof entry === 'object' ? deepClone(entry) : {};
+        const part = String(nextEntry.part || '').trim() || '未知';
+        const sourceCharacter = String(nextEntry.sourceCharacter || nextEntry.source_character || '').trim() || '无';
+        const safetyText = String(nextEntry.safety || '').trim().toUpperCase();
+        return {
+            id: nextEntry.id || newId(),
+            title: String(nextEntry.title || nextEntry.name || '未命名服装').trim() || '未命名服装',
+            part: part,
+            style: String(nextEntry.style || fallbackStyle || '').trim(),
+            sourceCharacter: sourceCharacter,
+            safety: safetyText === 'NSFW' ? 'NSFW' : 'SFW',
+            other: String(nextEntry.other || nextEntry.otherTags || nextEntry.other_tags || '').trim(),
+            prompt: String(nextEntry.prompt || '').trim()
+        };
+    }
+
+    const legacyCategoryLabels = {
+        tops: '上衣',
+        bottoms: '下装',
+        shoes: '鞋子',
+        headwear: '头饰',
+        accessories: '配件',
+        weapons: '武器',
+        others: '其他'
+    };
+    const legacyCategoryKeys = Object.keys(legacyCategoryLabels);
+
+    normalized.outfit = normalized.outfit.concat(legacyCharOutfits).reduce(function (result, group) {
+        const nextGroup = group && typeof group === 'object' ? deepClone(group) : {};
+        const hasLegacyCategories = legacyCategoryKeys.some(function (key) {
+            return Array.isArray(nextGroup[key]);
+        });
+
+        if (!hasLegacyCategories) {
+            result.push(normalizeOutfitEntry(nextGroup, ''));
+            return result;
+        }
+
+        const styleName = String(nextGroup.title || '').trim();
+        legacyCategoryKeys.forEach(function (key) {
+            const items = Array.isArray(nextGroup[key]) ? nextGroup[key] : [];
+            items.forEach(function (item) {
+                result.push(normalizeOutfitEntry({
+                    id: item.id || newId(),
+                    title: item.name || '未命名服装',
+                    part: legacyCategoryLabels[key] || '未知',
+                    style: styleName,
+                    sourceCharacter: '无',
+                    safety: 'SFW',
+                    other: '',
+                    prompt: item.prompt || ''
+                }, styleName));
+            });
+        });
+
+        return result;
+    }, []);
 
     return normalized;
 }

@@ -6,7 +6,7 @@ const {
   replaceAllData,
   readJsonSourceFile,
   getPromptData
-} = require('../db');
+} = require('../../db');
 const crypto = require('crypto');
 
 function countItems(data) {

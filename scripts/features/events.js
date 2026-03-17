@@ -9,7 +9,7 @@ function bindGroupEvents() {
 
     if (outfitGroupAddBtn) {
         outfitGroupAddBtn.addEventListener('click', async function () {
-            await addOutfitGroup();
+            await addOutfitEntry();
         });
     }
 }
@@ -234,16 +234,6 @@ function bindListEvents() {
                 return;
             }
 
-            if (action === 'rename-outfit-group') {
-                await renameOutfitGroup(btn.dataset.groupId, btn.dataset.groupTitle || '');
-                return;
-            }
-
-            if (action === 'delete-outfit-group') {
-                await deleteOutfitGroup(btn.dataset.groupId, btn.dataset.groupTitle || '');
-                return;
-            }
-
             if (action === 'add-item-start') {
                 addState = { tabId: btn.dataset.tabId, groupId: btn.dataset.groupId };
                 editState = null;
@@ -251,10 +241,61 @@ function bindListEvents() {
                 return;
             }
 
-            if (action === 'add-outfit-item-start') {
-                addState = { tabId: 'outfit', groupId: btn.dataset.groupId, categoryKey: btn.dataset.categoryKey || '' };
-                editState = null;
-                renderTab('outfit');
+            if (action === 'save-char-description') {
+                const groupId = btn.dataset.groupId || '';
+                if (!groupId) {
+                    return;
+                }
+                const selector = '[data-inline-form="char-description"][data-group-id="' + groupId + '"] [data-role="char-description-input"]';
+                const input = document.querySelector(selector);
+                const description = input ? input.value : '';
+                await saveCharDescriptionByValue(groupId, description);
+                return;
+            }
+
+            if (action === 'copy-char-base') {
+                const formNode = btn.closest('[data-inline-form="char-description"]');
+                const input = formNode ? formNode.querySelector('[data-role="char-description-input"]') : null;
+                const description = String(input ? input.value : '').trim();
+                if (!description) {
+                    showToast('角色描述不能为空');
+                    return;
+                }
+                copyPrompt(description);
+                return;
+            }
+
+            if (action === 'copy-char-with-outfit') {
+                const cardNode = btn.closest('.card');
+                const descFormNode = cardNode ? cardNode.querySelector('[data-inline-form="char-description"]') : null;
+                const descInput = descFormNode ? descFormNode.querySelector('[data-role="char-description-input"]') : null;
+                const basePrompt = String(descInput ? descInput.value : '').trim();
+                if (!basePrompt) {
+                    showToast('角色描述不能为空');
+                    return;
+                }
+
+                const outfitFormNode = btn.closest('[data-inline-form="char-copy-with-outfit"]');
+                const outfitSelect = outfitFormNode ? outfitFormNode.querySelector('[data-role="char-outfit-select"]') : null;
+                const outfitId = outfitSelect ? String(outfitSelect.value || '').trim() : '';
+                let outfitPrompt = '';
+                if (outfitId) {
+                    const outfitEntry = (promptData.outfit || []).find(function (entry) {
+                        return entry.id === outfitId;
+                    });
+                    if (!outfitEntry || !String(outfitEntry.prompt || '').trim()) {
+                        showToast('所选服装提示词为空');
+                        return;
+                    }
+                    outfitPrompt = outfitEntry.prompt;
+                }
+
+                const mergedPrompt = composeCharacterPrompt(basePrompt, outfitPrompt);
+                if (!mergedPrompt) {
+                    showToast('复制内容为空');
+                    return;
+                }
+                copyPrompt(mergedPrompt);
                 return;
             }
 
@@ -305,7 +346,8 @@ function bindListEvents() {
 
             if (action === 'edit-inline-cancel') {
                 editState = null;
-                renderTab(itemNode.dataset.tabId);
+                const tabId = itemNode.dataset.tabId;
+                renderTab(activeTab === 'chars' && tabId === 'outfit' ? 'chars' : tabId);
                 return;
             }
 
@@ -322,10 +364,9 @@ function bindListEvents() {
                 const tabId = itemNode.dataset.tabId;
                 const groupId = itemNode.dataset.groupId;
                 const itemId = itemNode.dataset.itemId;
-                const categoryKey = itemNode.dataset.categoryKey || '';
                 const itemName = btn.dataset.itemName || '该条目';
                 if (tabId === 'outfit') {
-                    await deleteOutfitItem(groupId, categoryKey, itemId, itemName);
+                    await deleteOutfitEntry(itemId, itemName);
                 } else {
                     await deleteItem(tabId, groupId, itemId, itemName);
                 }
@@ -522,9 +563,7 @@ function closeCharSettingsModal() {
 
 function bindTagFilterEvents() {
     if (!charTagFilters) {
-        if (!outfitCategoryFilters) {
-            return;
-        }
+        return;
     }
 
     if (charTagFilters) {
@@ -566,18 +605,6 @@ function bindTagFilterEvents() {
         });
     }
 
-    if (outfitCategoryFilters) {
-        outfitCategoryFilters.addEventListener('click', function (event) {
-            const btn = event.target.closest('button[data-action="filter-outfit-category"]');
-            if (!btn) {
-                return;
-            }
-
-            activeOutfitCategory = btn.dataset.category || '__all__';
-            renderOutfitCategoryFilters();
-            renderTab('outfit');
-        });
-    }
 }
 
 function bindCharSearchEvents() {

@@ -23,8 +23,7 @@
 	- `events.js`：按钮与输入框事件绑定
 - 加载顺序：`core/state -> core/utils -> core/data -> features/render -> features/actions -> features/events -> core/main`
 - 业务模块：`人物 / 动作 / 环境质量 / 服装`
-- 服装模块结构：按“风格”分组，每个风格下含 `上衣(tops) / 下装(bottoms) / 鞋子(shoes) / 头饰(headwear) / 配件(accessories) / 武器(weapons) / 其他(others)` 子分类
-- 服装页支持按子分类筛选显示（全部 / 上衣 / 下装 / 鞋子 / 头饰 / 配件 / 武器 / 其他）
+- 服装模块结构：单层条目卡片（无二级菜单），每个条目包含标签字段：`部位(必填) / 风格 / 来源角色 / 安全性(SFW|NSFW) / 其他`，并保留 `prompt` 内容
 - 角色标签支持分类写法：`分类:标签`（例如 `阵营:维多利亚`），筛选区会按分类分组展示
 
 快速使用
@@ -32,7 +31,7 @@
 2. 启动：`npm start` 或 双击 `start-windows.bat`
 3. 打开浏览器访问 `http://localhost:3000`（端口以 `server.js` 配置为准）
 
-后端 API（SQLite 架构）
+后端 API
 - `GET /api/auth/github/start`：跳转到 GitHub 授权页
 - `GET /api/auth/github/callback`：GitHub 回调并签发本地 access/refresh token
 - `POST /api/auth/refresh`：刷新 access token（并轮换 refresh token）
@@ -61,7 +60,7 @@
 - 登录用户若首次无私有数据，会自动从公共模板初始化一份可编辑数据。
 - 本地账号注册/密码登录已禁用，仅允许 GitHub OAuth 登录。
 
-GitHub OAuth 配置
+用户认证（GitHub OAuth） 配置
 1. 在 GitHub 创建 OAuth App。
 2. 回调地址设置为：`http://localhost:3000/api/auth/github/callback`（或你的端口）。
 3. 配置敏感信息（二选一）：
@@ -75,15 +74,6 @@ GitHub OAuth 配置
 	- 可选：`GITHUB_CALLBACK_URL`
 5. 打开页面后，在“个人信息”页点击“使用 GitHub 登录”。
 6. 如需启用批量 JSON 导入，在“个人信息”页输入管理员激活码并激活管理员权限。
-
-安全提醒
-- 不要把 `GITHUB_CLIENT_SECRET`、`ACCESS_TOKEN_SECRET` 提交到仓库。
-- `secrets.local.json`、`.env`、`.env.local` 已在 `.gitignore` 中忽略。
-
-SQLite 迁移
-1. 安装依赖：`npm install`
-2. 执行迁移：`npm run migrate:sqlite`
-3. 启动服务：`npm start`
 
 Agent Skill（关键词检索提示词）
 - 接口：`GET /api/agent-skill/search`
@@ -106,5 +96,3 @@ Agent Skill（关键词检索提示词）
 - `total`：命中条数
 - `results`：结果列表（含 `itemName`、`prompt`、`score`、`matchedFields` 等）
 
-重要声明
-该项目纯属个人 vibe coding 产物，缺乏安全性、输入校验和错误处理。强烈不建议在生产环境或公开场合使用或直接共享。

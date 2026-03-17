@@ -33,7 +33,7 @@
                 <input id="char-group-title-input" type="text" placeholder="输入角色分组名称，例如：🧝 精灵射手" />
                 <button id="char-group-add-btn" class="copy-btn" type="button">新增角色</button>
             </div>
-            <div class="hint-text">提示：人物提示词请在对应角色卡片中直接新增或编辑。</div>
+            <div class="hint-text">提示：在角色卡片里维护“角色自身特征”，可选择只复制角色特征，或叠加某个服装提示词后复制。</div>
         </div>
 
         <div class="card">
@@ -72,17 +72,31 @@
 
     <div id="tab-outfit" class="container">
         <div class="card">
-            <div class="editor-title">新增服装风格</div>
+            <div class="editor-title">新增服装条目</div>
             <div class="inline-add">
-                <input id="outfit-group-title-input" type="text" placeholder="输入风格名称，例如：街头机能风" />
-                <button id="outfit-group-add-btn" class="copy-btn" type="button">新增风格</button>
+                <input id="outfit-group-title-input" type="text" placeholder="条目名称（例如：夜行战术外套）" />
+                <select id="outfit-part-input">
+                    <option value="套装">部位：套装</option>
+                    <option value="上衣">部位：上衣</option>
+                    <option value="下装">部位：下装</option>
+                    <option value="鞋子">部位：鞋子</option>
+                    <option value="头饰">部位：头饰</option>
+                    <option value="配件">部位：配件</option>
+                    <option value="武器">部位：武器</option>
+                    <option value="其他">部位：其他</option>
+                    <option value="未知">部位：未知</option>
+                </select>
+                <input id="outfit-style-input" type="text" placeholder="风格（可选，例如：机能街头）" />
+                <input id="outfit-source-character-input" type="text" placeholder="来源角色（没有请填：无）" value="无" />
+                <select id="outfit-safety-input">
+                    <option value="SFW">安全性：SFW</option>
+                    <option value="NSFW">安全性：NSFW</option>
+                </select>
+                <input id="outfit-other-input" type="text" placeholder="其他标签（可选，逗号分隔）" />
+                <textarea id="outfit-prompt-input" placeholder="提示词内容"></textarea>
+                <button id="outfit-group-add-btn" class="copy-btn" type="button">新增条目</button>
             </div>
-            <div class="hint-text">提示：每个风格下可按上衣、下装、鞋子、头饰、配件、武器、其他分类管理提示词。</div>
-        </div>
-        <div class="card">
-            <div class="editor-title">服装分类筛选</div>
-            <div id="outfit-category-filters" class="tag-filter-wrap"></div>
-            <div class="hint-text" style="margin-top: 8px;">提示：可按分类筛选显示对应条目模块。</div>
+            <div class="hint-text">标签字段：部位（必填，无则未知）、风格、来源角色、安全性（SFW/NSFW）、其他。</div>
         </div>
         <div id="list-outfit"></div>
     </div>

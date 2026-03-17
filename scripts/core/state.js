@@ -3,18 +3,14 @@ const defaultPromptData = {
         {
             id: 'cyber-girl',
             title: '👨‍🎤 赛博朋克女孩 (Cyber Girl)',
-            items: [
-                { id: 'cg-1', name: '标准战斗服', prompt: '1girl, solo, cyberpunk style, neon lights, black combat suit, glowing visor, high detail, masterpiece' },
-                { id: 'cg-2', name: '休闲夹克装', prompt: '1girl, solo, cyberpunk style, daylight, wearing oversized yellow jacket, crop top, streetwear, high resolution' }
-            ]
+            description: '1girl, solo, cyberpunk style, neon lights, short silver hair, glowing visor, high detail, masterpiece',
+            items: []
         },
         {
             id: 'fantasy-mage',
             title: '🧙‍♂️ 奇幻法师 (Fantasy Mage)',
-            items: [
-                { id: 'fm-1', name: '星空长袍', prompt: '1boy, male mage, long wizard robe with starry patterns, holding glowing staff, casting spell, fantasy illustration' },
-                { id: 'fm-2', name: '旅行斗篷', prompt: '1boy, male traveler, ragged cloak, holding old book, walking in forest, dynamic lighting, 8k' }
-            ]
+            description: '1boy, male mage, fantasy illustration, glowing staff, arcane aura, dramatic lighting, ultra detailed',
+            items: []
         }
     ],
     actions: [
@@ -48,36 +44,30 @@ const defaultPromptData = {
     ],
     outfit: [
         {
-            id: 'outfit-street-tech',
-            title: '🧥 街头机能风',
-            tops: [
-                { id: 'ot-st-1', name: '机能短夹克', prompt: 'techwear cropped jacket, functional pockets, nylon texture, matte black, detailed seams' }
-            ],
-            bottoms: [
-                { id: 'ob-st-1', name: '束脚工装裤', prompt: 'cargo jogger pants, tactical straps, layered panels, urban techwear style' }
-            ],
-            shoes: [
-                { id: 'os-st-1', name: '厚底机能鞋', prompt: 'chunky tech sneakers, high-top silhouette, monochrome design, streetwear fashion' }
-            ],
-            headwear: [],
-            accessories: [],
-            weapons: [],
-            others: []
+            id: 'outfit-test-1',
+            title: '星穹巡礼礼装',
+            part: '套装',
+            style: '轻奢幻想',
+            sourceCharacter: '塞拉',
+            safety: 'SFW',
+            other: '披风,金线刺绣',
+            prompt: 'full body, fantasy ceremonial outfit, white and gold layered dress, cape, detailed embroidery, cinematic lighting, masterpiece'
+        },
+        {
+            id: 'outfit-test-2',
+            title: '夜行战术外套',
+            part: '上衣',
+            style: '机能街头',
+            sourceCharacter: '无',
+            safety: 'NSFW',
+            other: '短款,束带,皮革拼接',
+            prompt: 'single upper-body outfit, black tactical cropped jacket, belts and straps, glossy leather panels, cyberpunk neon, ultra detailed'
         }
     ]
 };
 
 const TAB_KEYS = ['chars', 'actions', 'env', 'outfit'];
-const OUTFIT_CATEGORY_KEYS = ['tops', 'bottoms', 'shoes', 'headwear', 'accessories', 'weapons', 'others'];
-const OUTFIT_CATEGORY_LABELS = {
-    tops: '上衣',
-    bottoms: '下装',
-    shoes: '鞋子',
-    headwear: '头饰',
-    accessories: '配件',
-    weapons: '武器',
-    others: '其他'
-};
+const OUTFIT_PART_OPTIONS = ['套装', '上衣', '下装', '鞋子', '头饰', '配件', '武器', '其他', '未知'];
 
 let promptData = JSON.parse(JSON.stringify(defaultPromptData));
 let activeTab = 'chars';
@@ -88,7 +78,6 @@ let activeCharTagEditor = null;
 let activeCharTags = [];
 let activeCharTagMode = 'or';
 let activeCharKeyword = '';
-let activeOutfitCategory = '__all__';
 let isReadOnlyMode = false;
 let isAdminUser = false;
 let currentUserId = '';
@@ -100,7 +89,12 @@ const charGroupTitleInput = document.getElementById('char-group-title-input');
 const charGroupAddBtn = document.getElementById('char-group-add-btn');
 const outfitGroupTitleInput = document.getElementById('outfit-group-title-input');
 const outfitGroupAddBtn = document.getElementById('outfit-group-add-btn');
-const outfitCategoryFilters = document.getElementById('outfit-category-filters');
+const outfitPartInput = document.getElementById('outfit-part-input');
+const outfitStyleInput = document.getElementById('outfit-style-input');
+const outfitSourceCharacterInput = document.getElementById('outfit-source-character-input');
+const outfitSafetyInput = document.getElementById('outfit-safety-input');
+const outfitOtherInput = document.getElementById('outfit-other-input');
+const outfitPromptInput = document.getElementById('outfit-prompt-input');
 const charTagFilters = document.getElementById('char-tag-filters');
 const charNameSearch = document.getElementById('char-name-search');
 const charNameSearchClear = document.getElementById('char-name-search-clear');

@@ -6,6 +6,67 @@ const DB_FILE = path.join(__dirname, 'data.sqlite');
 const JSON_DATA_FILE = path.join(__dirname, 'data.json');
 const LEGACY_JSON_DATA_FILE = path.join(__dirname, 'prompt-data.json');
 const OUTFIT_CATEGORY_KEYS = ['tops', 'bottoms', 'shoes', 'headwear', 'accessories', 'weapons', 'others'];
+const LEGACY_OUTFIT_CATEGORY_LABELS = {
+  tops: '上衣',
+  bottoms: '下装',
+  shoes: '鞋子',
+  headwear: '头饰',
+  accessories: '配件',
+  weapons: '武器',
+  others: '其他'
+};
+
+function normalizeOutfitPart(partValue) {
+  const text = String(partValue || '').trim();
+  return text || '未知';
+}
+
+function normalizeOutfitSafety(safetyValue) {
+  const text = String(safetyValue || '').trim().toUpperCase();
+  return text === 'NSFW' ? 'NSFW' : 'SFW';
+}
+
+function normalizeOutfitEntry(entry, fallbackStyle) {
+  const nextEntry = entry && typeof entry === 'object' ? deepClone(entry) : {};
+  return {
+    id: nextEntry.id || newId(),
+    title: String(nextEntry.title || nextEntry.name || '未命名服装').trim() || '未命名服装',
+    part: normalizeOutfitPart(nextEntry.part),
+    style: String(nextEntry.style || fallbackStyle || '').trim(),
+    sourceCharacter: String(nextEntry.sourceCharacter || nextEntry.source_character || '').trim() || '无',
+    safety: normalizeOutfitSafety(nextEntry.safety),
+    other: String(nextEntry.other || nextEntry.otherTags || nextEntry.other_tags || '').trim(),
+    prompt: String(nextEntry.prompt || '').trim()
+  };
+}
+
+function isLegacyOutfitGroup(group) {
+  if (!group || typeof group !== 'object') {
+    return false;
+  }
+  return OUTFIT_CATEGORY_KEYS.some(categoryKey => Array.isArray(group[categoryKey]));
+}
+
+function flattenLegacyOutfitGroup(group) {
+  const styleName = String(group.title || '').trim();
+  const entries = [];
+  OUTFIT_CATEGORY_KEYS.forEach(categoryKey => {
+    const items = Array.isArray(group[categoryKey]) ? group[categoryKey] : [];
+    items.forEach(item => {
+      entries.push(normalizeOutfitEntry({
+        id: item.id || newId(),
+        title: item.name || '未命名服装',
+        part: LEGACY_OUTFIT_CATEGORY_LABELS[categoryKey] || '未知',
+        style: styleName,
+        sourceCharacter: '无',
+        safety: 'SFW',
+        other: '',
+        prompt: item.prompt || ''
+      }, styleName));
+    });
+  });
+  return entries;
+}
 
 function newId() {
   return 'id-' + Date.now() + '-' + Math.floor(Math.random() * 10000);
@@ -35,6 +96,7 @@ function parseTags(value) {
 
 function normalizePromptData(data) {
   const normalized = deepClone(data || {});
+  const legacyCharOutfits = [];
   ['chars', 'actions', 'env', 'outfit'].forEach(key => {
     if (!Array.isArray(normalized[key])) {
       normalized[key] = [];
@@ -53,24 +115,46 @@ function normalizePromptData(data) {
 
   normalized.chars = normalized.chars.map(group => {
     const nextGroup = group && typeof group === 'object' ? deepClone(group) : { id: newId(), title: '未命名角色', items: [], tags: [] };
-    if (!Array.isArray(nextGroup.items)) {
-      nextGroup.items = [];
-    }
+    const legacyItems = Array.isArray(nextGroup.items) ? nextGroup.items : [];
+    nextGroup.items = [];
     if (!Array.isArray(nextGroup.tags)) {
       nextGroup.tags = [];
     }
+    const rawDescription = String(nextGroup.description || '').trim();
+    if (rawDescription) {
+      nextGroup.description = rawDescription;
+    } else {
+      const firstItem = legacyItems[0] || null;
+      nextGroup.description = firstItem && firstItem.prompt ? String(firstItem.prompt).trim() : '';
+    }
+
+    legacyItems.forEach(item => {
+      const promptText = String(item && item.prompt ? item.prompt : '').trim();
+      if (!promptText) {
+        return;
+      }
+      legacyCharOutfits.push({
+        id: item.id || newId(),
+        title: String(item && item.name ? item.name : '未命名服装').trim() || '未命名服装',
+        part: '未知',
+        style: '',
+        sourceCharacter: String(nextGroup.title || '').trim() || '无',
+        safety: 'SFW',
+        other: '',
+        prompt: promptText
+      });
+    });
+
     return nextGroup;
   });
 
-  normalized.outfit = normalized.outfit.map(group => {
-    const nextGroup = group && typeof group === 'object' ? deepClone(group) : { id: newId(), title: '未命名风格' };
-    OUTFIT_CATEGORY_KEYS.forEach(categoryKey => {
-      if (!Array.isArray(nextGroup[categoryKey])) {
-        nextGroup[categoryKey] = [];
-      }
-    });
-    return nextGroup;
-  });
+  normalized.outfit = normalized.outfit.concat(legacyCharOutfits).reduce((result, group) => {
+    if (isLegacyOutfitGroup(group)) {
+      return result.concat(flattenLegacyOutfitGroup(group));
+    }
+    result.push(normalizeOutfitEntry(group, ''));
+    return result;
+  }, []);
 
   return normalized;
 }
@@ -120,6 +204,7 @@ function openDatabase() {
       id TEXT PRIMARY KEY,
       owner_user_id TEXT NOT NULL DEFAULT '',
       title TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
       tags_json TEXT NOT NULL DEFAULT '[]'
     );
 
@@ -156,6 +241,13 @@ function openDatabase() {
   ensureColumn(db, 'users', 'display_name', "display_name TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, 'users', 'avatar_url', "avatar_url TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, 'users', 'is_admin', 'is_admin INTEGER NOT NULL DEFAULT 0');
+  ensureColumn(db, 'characters', 'description', "description TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, 'outfits', 'part', "part TEXT NOT NULL DEFAULT '未知'");
+  ensureColumn(db, 'outfits', 'style', "style TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, 'outfits', 'source_character', "source_character TEXT NOT NULL DEFAULT '无'");
+  ensureColumn(db, 'outfits', 'safety', "safety TEXT NOT NULL DEFAULT 'SFW'");
+  ensureColumn(db, 'outfits', 'other_tags', "other_tags TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, 'outfits', 'prompt', "prompt TEXT NOT NULL DEFAULT ''");
 
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_users_provider_external ON users(provider, provider_user_id);
@@ -169,7 +261,60 @@ function openDatabase() {
     CREATE INDEX IF NOT EXISTS idx_prompts_owner_group ON prompts(owner_user_id, group_id);
   `);
 
+  migrateCharacterPromptsToDescription(db);
+
   return db;
+}
+
+function migrateCharacterPromptsToDescription(db) {
+  const tx = db.transaction(() => {
+    const chars = db.prepare('SELECT id, owner_user_id, description FROM characters').all();
+    const firstPromptStmt = db.prepare("SELECT prompt FROM prompts WHERE owner_user_id = ? AND section = 'chars' AND group_id = ? ORDER BY rowid ASC LIMIT 1");
+    const updateDescriptionStmt = db.prepare('UPDATE characters SET description = ? WHERE owner_user_id = ? AND id = ?');
+    const legacyPromptRows = db.prepare(
+      `SELECT prompts.owner_user_id, prompts.group_id, prompts.name, prompts.prompt, characters.title AS character_title
+       FROM prompts
+       LEFT JOIN characters ON characters.id = prompts.group_id
+       WHERE prompts.section = 'chars'
+       ORDER BY prompts.rowid ASC`
+    ).all();
+    const findDuplicatedOutfitStmt = db.prepare('SELECT id FROM outfits WHERE owner_user_id = ? AND title = ? AND source_character = ? AND prompt = ? LIMIT 1');
+    const insertOutfitStmt = db.prepare('INSERT INTO outfits(id, owner_user_id, title, part, style, source_character, safety, other_tags, prompt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+
+    chars.forEach(row => {
+      const currentDescription = String(row.description || '').trim();
+      if (currentDescription) {
+        return;
+      }
+      const firstPromptRow = firstPromptStmt.get(row.owner_user_id || '', row.id);
+      const nextDescription = String(firstPromptRow && firstPromptRow.prompt ? firstPromptRow.prompt : '').trim();
+      if (!nextDescription) {
+        return;
+      }
+      updateDescriptionStmt.run(nextDescription, row.owner_user_id || '', row.id);
+    });
+
+    legacyPromptRows.forEach(row => {
+      const ownerUserId = String(row.owner_user_id || '').trim();
+      const promptText = String(row.prompt || '').trim();
+      if (!ownerUserId || !promptText) {
+        return;
+      }
+
+      const outfitTitle = String(row.name || '').trim() || '未命名服装';
+      const sourceCharacter = String(row.character_title || '').trim() || '无';
+      const duplicated = findDuplicatedOutfitStmt.get(ownerUserId, outfitTitle, sourceCharacter, promptText);
+      if (duplicated) {
+        return;
+      }
+
+      insertOutfitStmt.run(newId(), ownerUserId, outfitTitle, '未知', '', sourceCharacter, 'SFW', '', promptText);
+    });
+
+    db.prepare("DELETE FROM prompts WHERE section = 'chars'").run();
+  });
+
+  tx();
 }
 
 function adoptOrphanData(db, ownerUserId) {
@@ -195,8 +340,8 @@ function replaceAllData(db, inputData, ownerUserId) {
   }
 
   const data = normalizePromptData(inputData);
-  const insertCharacter = db.prepare('INSERT INTO characters(id, owner_user_id, title, tags_json) VALUES (?, ?, ?, ?)');
-  const insertOutfit = db.prepare('INSERT INTO outfits(id, owner_user_id, title) VALUES (?, ?, ?)');
+  const insertCharacter = db.prepare('INSERT INTO characters(id, owner_user_id, title, description, tags_json) VALUES (?, ?, ?, ?, ?)');
+  const insertOutfit = db.prepare('INSERT INTO outfits(id, owner_user_id, title, part, style, source_character, safety, other_tags, prompt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
   const insertPromptGroup = db.prepare('INSERT INTO prompt_groups(id, owner_user_id, section, title) VALUES (?, ?, ?, ?)');
   const insertPrompt = db.prepare('INSERT INTO prompts(id, owner_user_id, section, group_id, category_key, name, prompt) VALUES (?, ?, ?, ?, ?, ?, ?)');
 
@@ -208,11 +353,13 @@ function replaceAllData(db, inputData, ownerUserId) {
 
     data.chars.forEach(group => {
       const groupId = group.id || newId();
-      insertCharacter.run(groupId, owner, group.title || '', JSON.stringify(Array.isArray(group.tags) ? group.tags : []));
-      const items = Array.isArray(group.items) ? group.items : [];
-      items.forEach(item => {
-        insertPrompt.run(item.id || newId(), owner, 'chars', groupId, '', item.name || '', item.prompt || '');
-      });
+      insertCharacter.run(
+        groupId,
+        owner,
+        group.title || '',
+        String(group.description || '').trim(),
+        JSON.stringify(Array.isArray(group.tags) ? group.tags : [])
+      );
     });
 
     data.actions.forEach(group => {
@@ -233,15 +380,19 @@ function replaceAllData(db, inputData, ownerUserId) {
       });
     });
 
-    data.outfit.forEach(group => {
-      const groupId = group.id || newId();
-      insertOutfit.run(groupId, owner, group.title || '');
-      OUTFIT_CATEGORY_KEYS.forEach(categoryKey => {
-        const items = Array.isArray(group[categoryKey]) ? group[categoryKey] : [];
-        items.forEach(item => {
-          insertPrompt.run(item.id || newId(), owner, 'outfit', groupId, categoryKey, item.name || '', item.prompt || '');
-        });
-      });
+    data.outfit.forEach(entry => {
+      const normalizedEntry = normalizeOutfitEntry(entry, '');
+      insertOutfit.run(
+        normalizedEntry.id || newId(),
+        owner,
+        normalizedEntry.title || '',
+        normalizedEntry.part,
+        normalizedEntry.style,
+        normalizedEntry.sourceCharacter,
+        normalizedEntry.safety,
+        normalizedEntry.other,
+        normalizedEntry.prompt
+      );
     });
   });
 
@@ -279,7 +430,7 @@ function getPromptData(db, ownerUserId, options = {}) {
     : '';
 
   const characters = db.prepare(
-    `SELECT characters.id, characters.owner_user_id, characters.title, characters.tags_json${uploaderSelect}
+    `SELECT characters.id, characters.owner_user_id, characters.title, characters.description, characters.tags_json${uploaderSelect}
      FROM characters
      LEFT JOIN users ON users.id = characters.owner_user_id
      ${ownerFilterSql.replace('%TABLE%', 'characters')}
@@ -303,7 +454,7 @@ function getPromptData(db, ownerUserId, options = {}) {
   ).all(...ownerParams);
 
   const outfits = db.prepare(
-    `SELECT outfits.id, outfits.owner_user_id, outfits.title${uploaderSelect}
+    `SELECT outfits.id, outfits.owner_user_id, outfits.title, outfits.part, outfits.style, outfits.source_character, outfits.safety, outfits.other_tags, outfits.prompt${uploaderSelect}
      FROM outfits
      LEFT JOIN users ON users.id = outfits.owner_user_id
      ${ownerFilterSql.replace('%TABLE%', 'outfits')}
@@ -318,16 +469,34 @@ function getPromptData(db, ownerUserId, options = {}) {
      ORDER BY prompts.rowid ASC`
   ).all(...ownerParams);
 
-  const charsById = new Map();
   const actionsById = new Map();
   const envById = new Map();
-  const outfitById = new Map();
-
+  const legacyOutfitStyleById = new Map();
+  const outfit = outfits.map(row => {
+    const entry = {
+      id: row.id,
+      ownerUserId: row.owner_user_id || '',
+      title: row.title || '',
+      part: normalizeOutfitPart(row.part),
+      style: String(row.style || '').trim(),
+      sourceCharacter: String(row.source_character || '').trim() || '无',
+      safety: normalizeOutfitSafety(row.safety),
+      other: String(row.other_tags || '').trim(),
+      prompt: String(row.prompt || '').trim()
+    };
+    if (includeUploader) {
+      entry.uploader = resolveUploaderName(entry.ownerUserId, row.uploader);
+      entry.uploaderAvatarUrl = resolveUploaderAvatar(row.uploader_avatar_url);
+    }
+    legacyOutfitStyleById.set(entry.id, entry.style || entry.title || '');
+    return entry;
+  });
   const chars = characters.map(row => {
     const group = {
       id: row.id,
       ownerUserId: row.owner_user_id || '',
       title: row.title,
+      description: String(row.description || '').trim(),
       tags: safeParseTagsJson(row.tags_json),
       items: []
     };
@@ -335,7 +504,6 @@ function getPromptData(db, ownerUserId, options = {}) {
       group.uploader = resolveUploaderName(group.ownerUserId, row.uploader);
       group.uploaderAvatarUrl = resolveUploaderAvatar(row.uploader_avatar_url);
     }
-    charsById.set(row.id, group);
     return group;
   });
 
@@ -359,27 +527,6 @@ function getPromptData(db, ownerUserId, options = {}) {
     return group;
   });
 
-  const outfit = outfits.map(row => {
-    const group = {
-      id: row.id,
-      ownerUserId: row.owner_user_id || '',
-      title: row.title,
-      tops: [],
-      bottoms: [],
-      shoes: [],
-      headwear: [],
-      accessories: [],
-      weapons: [],
-      others: []
-    };
-    if (includeUploader) {
-      group.uploader = resolveUploaderName(group.ownerUserId, row.uploader);
-      group.uploaderAvatarUrl = resolveUploaderAvatar(row.uploader_avatar_url);
-    }
-    outfitById.set(row.id, group);
-    return group;
-  });
-
   prompts.forEach(row => {
     const item = {
       id: row.id,
@@ -392,10 +539,6 @@ function getPromptData(db, ownerUserId, options = {}) {
       item.uploaderAvatarUrl = resolveUploaderAvatar(row.uploader_avatar_url);
     }
     if (row.section === 'chars') {
-      const group = charsById.get(row.group_id);
-      if (group) {
-        group.items.push(item);
-      }
       return;
     }
     if (row.section === 'actions') {
@@ -413,11 +556,24 @@ function getPromptData(db, ownerUserId, options = {}) {
       return;
     }
     if (row.section === 'outfit') {
-      const group = outfitById.get(row.group_id);
-      const categoryKey = OUTFIT_CATEGORY_KEYS.includes(row.category_key) ? row.category_key : 'others';
-      if (group) {
-        group[categoryKey].push(item);
+      const styleName = legacyOutfitStyleById.get(row.group_id) || '';
+      const partLabel = LEGACY_OUTFIT_CATEGORY_LABELS[row.category_key] || '未知';
+      const legacyEntry = {
+        id: row.id,
+        ownerUserId: row.owner_user_id || '',
+        title: row.name || '未命名服装',
+        part: partLabel,
+        style: styleName,
+        sourceCharacter: '无',
+        safety: 'SFW',
+        other: '',
+        prompt: row.prompt || ''
+      };
+      if (includeUploader) {
+        legacyEntry.uploader = resolveUploaderName(legacyEntry.ownerUserId, row.uploader);
+        legacyEntry.uploaderAvatarUrl = resolveUploaderAvatar(row.uploader_avatar_url);
       }
+      outfit.push(legacyEntry);
     }
   });
 
@@ -430,15 +586,14 @@ function getCharacters(db, ownerUserId) {
     return [];
   }
 
-  const rows = db.prepare('SELECT id, title, tags_json FROM characters WHERE owner_user_id = ? ORDER BY rowid ASC').all(owner);
-  const countStmt = db.prepare("SELECT COUNT(*) AS total FROM prompts WHERE owner_user_id = ? AND section = 'chars' AND group_id = ?");
+  const rows = db.prepare('SELECT id, title, description, tags_json FROM characters WHERE owner_user_id = ? ORDER BY rowid ASC').all(owner);
   return rows.map(row => {
-    const itemCountRow = countStmt.get(owner, row.id);
     return {
       id: row.id,
       title: row.title,
+      description: String(row.description || '').trim(),
       tags: safeParseTagsJson(row.tags_json),
-      itemCount: itemCountRow ? itemCountRow.total : 0
+      itemCount: 0
     };
   });
 }
@@ -507,40 +662,98 @@ function searchPromptDatabase(db, ownerUserId, keyword, options = {}) {
       const groupTags = Array.isArray(group.tags) ? group.tags : [];
 
       if (section === 'outfit') {
-        OUTFIT_CATEGORY_KEYS.forEach(categoryKey => {
-          const items = Array.isArray(group[categoryKey]) ? group[categoryKey] : [];
-          items.forEach(item => {
-            const matchedFields = [];
-            let totalScore = 0;
+        const matchedFields = [];
+        let totalScore = 0;
 
-            const nameScore = scoreField(keyword, normalizedKeyword, item.name || '');
-            if (nameScore > 0) {
-              matchedFields.push('item.name');
-              totalScore += nameScore + 30;
-            }
-            const titleScore = scoreField(keyword, normalizedKeyword, group.title || '');
-            if (titleScore > 0) {
-              matchedFields.push('group.title');
-              totalScore += titleScore + 20;
-            }
-            const categoryLabelMap = { tops: '上衣', bottoms: '下装', shoes: '鞋子', headwear: '头饰', accessories: '配件', weapons: '武器', others: '其他' };
-            const categoryLabel = categoryLabelMap[categoryKey] || categoryKey;
-            const categoryScore = scoreField(keyword, normalizedKeyword, categoryLabel);
-            if (categoryScore > 0) {
-              matchedFields.push('outfit.category');
-              totalScore += categoryScore + 10;
-            }
-            const promptScore = scoreField(keyword, normalizedKeyword, item.prompt || '');
-            if (promptScore > 0) {
-              matchedFields.push('item.prompt');
-              totalScore += promptScore;
-            }
+        const titleScore = scoreField(keyword, normalizedKeyword, group.title || '');
+        if (titleScore > 0) {
+          matchedFields.push('item.title');
+          totalScore += titleScore + 30;
+        }
 
-            if (totalScore > 0) {
-              results.push({ section, groupId: group.id, groupTitle: group.title, itemId: item.id, itemName: item.name, prompt: item.prompt, categoryKey, tags: groupTags, score: totalScore, matchedFields });
-            }
+        const partScore = scoreField(keyword, normalizedKeyword, group.part || '');
+        if (partScore > 0) {
+          matchedFields.push('outfit.part');
+          totalScore += partScore + 20;
+        }
+
+        const styleScore = scoreField(keyword, normalizedKeyword, group.style || '');
+        if (styleScore > 0) {
+          matchedFields.push('outfit.style');
+          totalScore += styleScore + 20;
+        }
+
+        const sourceCharacterScore = scoreField(keyword, normalizedKeyword, group.sourceCharacter || '');
+        if (sourceCharacterScore > 0) {
+          matchedFields.push('outfit.sourceCharacter');
+          totalScore += sourceCharacterScore + 10;
+        }
+
+        const otherScore = scoreField(keyword, normalizedKeyword, group.other || '');
+        if (otherScore > 0) {
+          matchedFields.push('outfit.other');
+          totalScore += otherScore + 8;
+        }
+
+        const promptScore = scoreField(keyword, normalizedKeyword, group.prompt || '');
+        if (promptScore > 0) {
+          matchedFields.push('item.prompt');
+          totalScore += promptScore;
+        }
+
+        if (totalScore > 0) {
+          results.push({
+            section,
+            groupId: group.id,
+            groupTitle: group.style || group.title,
+            itemId: group.id,
+            itemName: group.title,
+            prompt: group.prompt,
+            categoryKey: group.part || '',
+            tags: groupTags,
+            score: totalScore,
+            matchedFields
           });
-        });
+        }
+        return;
+      }
+
+      if (section === 'chars') {
+        const matchedFields = [];
+        let totalScore = 0;
+
+        const titleScore = scoreField(keyword, normalizedKeyword, group.title || '');
+        if (titleScore > 0) {
+          matchedFields.push('group.title');
+          totalScore += titleScore + 30;
+        }
+
+        const tagScore = groupTags.reduce((best, tag) => Math.max(best, scoreField(keyword, normalizedKeyword, tag)), 0);
+        if (tagScore > 0) {
+          matchedFields.push('group.tags');
+          totalScore += tagScore + 15;
+        }
+
+        const descriptionScore = scoreField(keyword, normalizedKeyword, group.description || '');
+        if (descriptionScore > 0) {
+          matchedFields.push('group.description');
+          totalScore += descriptionScore;
+        }
+
+        if (totalScore > 0) {
+          results.push({
+            section,
+            groupId: group.id,
+            groupTitle: group.title,
+            itemId: group.id,
+            itemName: group.title,
+            prompt: group.description || '',
+            categoryKey: '',
+            tags: groupTags,
+            score: totalScore,
+            matchedFields
+          });
+        }
         return;
       }
 
