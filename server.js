@@ -11,7 +11,8 @@ const {
   replaceAllData,
   getPromptData,
   getCharacters,
-  searchPromptDatabase
+  searchPromptDatabase,
+  readJsonSourceFile
 } = require('./db');
 
 const PORT = process.env.PORT || 3000;
@@ -1032,6 +1033,22 @@ app.put('/api/prompts', authRequired, ensureAdmin, (req, res) => {
     res.json({ message: '保存成功', data: getMergedPromptDataSnapshot() });
   } catch (error) {
     res.status(400).json({ message: '无法解析 JSON', detail: error.message });
+  }
+});
+
+app.post('/api/prompts/import-root', authRequired, ensureAdmin, (req, res) => {
+  try {
+    const sourceResult = readJsonSourceFile();
+    const normalized = normalizePromptData(sourceResult.data);
+    replaceAllData(db, normalized, req.user.id);
+    const sourceName = path.basename(sourceResult.source || 'prompt-data.json');
+    res.json({
+      message: `导入成功（来源：${sourceName}）`,
+      data: getMergedPromptDataSnapshot(),
+      source: sourceName
+    });
+  } catch (error) {
+    res.status(400).json({ message: error.message || '根目录 JSON 导入失败' });
   }
 });
 

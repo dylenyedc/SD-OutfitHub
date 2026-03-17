@@ -41,6 +41,7 @@
 - `GET /api/prompts/export`：下载 `prompt-data.json` 格式导出（浏览器附件下载）
 - `POST /api/prompts/mutate`：执行后端业务变更（新增/编辑/删除）
 - `PUT /api/prompts`：全量覆盖写入（用于导入/同步，仅管理员）
+- `POST /api/prompts/import-root`：从项目根目录读取 `data.json` 或 `prompt-data.json` 并覆盖导入（仅管理员）
 - `GET /api/characters`：读取角色列表
 - `POST /api/characters`：创建角色
 - `PUT /api/characters/:id`：更新角色
@@ -74,6 +75,9 @@
 	- 可选：`GITHUB_CALLBACK_URL`
 5. 打开页面后，在“个人信息”页点击“使用 GitHub 登录”。
 6. 如需启用批量 JSON 导入，在“个人信息”页输入管理员激活码并激活管理员权限。
+7. 导入支持两种方式（同一导入功能区）：
+	- 上传本地 JSON 文件（浏览器选择文件）
+	- 从项目根目录直接导入（读取 `data.json` 或 `prompt-data.json`）
 
 Agent Skill（关键词检索提示词）
 - 接口：`GET /api/agent-skill/search`

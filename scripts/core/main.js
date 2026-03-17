@@ -20,8 +20,9 @@ async function init() {
 
 function bindImportEvents() {
     const importBtn = document.getElementById('import-prompts-btn');
+    const importRootBtn = document.getElementById('import-prompts-root-btn');
     const importInput = document.getElementById('import-prompts-file');
-    if (!importBtn || !importInput) {
+    if (!importBtn || !importInput || !importRootBtn) {
         return;
     }
 
@@ -36,6 +37,29 @@ function bindImportEvents() {
         }
         importInput.value = '';
         importInput.click();
+    });
+
+    importRootBtn.addEventListener('click', async function () {
+        if (isReadOnlyMode || !hasAuthSession()) {
+            showToast('当前为只读模式，请先登录');
+            return;
+        }
+        if (!isAdminUser) {
+            showToast('仅管理员可执行批量导入');
+            return;
+        }
+
+        const confirmed = window.confirm('将从项目根目录读取 data.json 或 prompt-data.json，并覆盖当前账号下全部提示词数据，是否继续？');
+        if (!confirmed) {
+            return;
+        }
+
+        const result = await importPromptDataFromProjectRoot();
+        if (!result || !result.ok) {
+            return;
+        }
+
+        renderAllTabs();
     });
 
     importInput.addEventListener('change', async function () {
@@ -216,6 +240,7 @@ function initAuthUI() {
         });
 
         const importBtn = document.getElementById('import-prompts-btn');
+        const importRootBtn = document.getElementById('import-prompts-root-btn');
         if (importBtn) {
             importBtn.disabled = !!isReadOnlyMode || !isAdminUser;
             if (isReadOnlyMode) {
@@ -224,6 +249,16 @@ function initAuthUI() {
                 importBtn.title = '仅管理员可执行批量导入';
             } else {
                 importBtn.title = '';
+            }
+        }
+        if (importRootBtn) {
+            importRootBtn.disabled = !!isReadOnlyMode || !isAdminUser;
+            if (isReadOnlyMode) {
+                importRootBtn.title = '当前为只读模式，请先登录';
+            } else if (!isAdminUser) {
+                importRootBtn.title = '仅管理员可执行批量导入';
+            } else {
+                importRootBtn.title = '';
             }
         }
 

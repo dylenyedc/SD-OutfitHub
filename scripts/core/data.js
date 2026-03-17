@@ -374,6 +374,58 @@ async function importPromptDataFromJsonFile(file) {
     }
 }
 
+async function importPromptDataFromProjectRoot() {
+    if (isReadOnlyMode || !hasAuthSession()) {
+        showToast('当前为只读模式，请先使用 GitHub 登录后再导入');
+        return { ok: false, message: '当前为只读模式' };
+    }
+
+    if (!isAdminUser) {
+        showToast('仅管理员可执行批量导入');
+        return { ok: false, message: '仅管理员可执行批量导入' };
+    }
+
+    try {
+        const response = await apiFetch('/api/prompts/import-root', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
+        });
+
+        let result = null;
+        try {
+            result = await response.json();
+        } catch (_) {
+            result = null;
+        }
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                clearAuthTokens();
+                isAdminUser = false;
+                setReadOnlyMode(true);
+            }
+            const message = result && result.message ? result.message : '根目录导入失败';
+            showToast(message);
+            return { ok: false, message: message };
+        }
+
+        if (result && result.data) {
+            promptData = normalizePromptData(result.data);
+        }
+
+        const message = result && result.message ? result.message : '根目录导入成功';
+        showToast(message);
+        return { ok: true, message: message };
+    } catch (error) {
+        console.error('根目录导入失败', error);
+        showToast('导入失败，请检查服务状态');
+        return { ok: false, message: '请求失败' };
+    }
+}
+
 async function activateAdminWithCode(codeRaw) {
     const code = String(codeRaw || '').trim();
     if (!code) {

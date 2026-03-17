@@ -73,7 +73,6 @@ let promptData = JSON.parse(JSON.stringify(defaultPromptData));
 let activeTab = 'chars';
 let editState = null;
 let addState = null;
-let activeCharGroupMenuId = null;
 let activeCharTagEditor = null;
 let activeCharTags = [];
 let activeCharTagMode = 'or';

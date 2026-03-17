@@ -15,25 +15,6 @@ async function addCharGroupByTitle(titleRaw) {
     return true;
 }
 
-async function editCharGroupTags(groupId) {
-    const groups = promptData.chars || [];
-    const targetGroup = groups.find(function (group) {
-        return group.id === groupId;
-    });
-    if (!targetGroup) {
-        showToast('角色分组不存在');
-        return false;
-    }
-
-    const oldTagsText = (targetGroup.tags || []).join(', ');
-    const nextTagsRaw = window.prompt('请输入标签，多个标签用英文逗号分隔；建议用“分类:标签”格式，例如：作品:明日方舟, 性别:女, 分级:SFW, 其他:维多利亚', oldTagsText);
-    if (nextTagsRaw === null) {
-        return false;
-    }
-
-    return editCharGroupTagsByValue(groupId, nextTagsRaw);
-}
-
 async function editCharGroupTagsByValue(groupId, nextTagsRaw) {
     const nextTags = parseTags(nextTagsRaw);
     const result = await mutatePromptData('editCharGroupTags', { groupId: groupId, tags: nextTags });
@@ -113,22 +94,6 @@ async function deleteCharTagByValue(groupId, oldTag) {
     renderTab('chars');
     showToast(result.message);
     return true;
-}
-
-async function renameCharGroup(groupId, oldTitle) {
-    const groups = promptData.chars || [];
-    const targetGroup = groups.find(group => group.id === groupId);
-    if (!targetGroup) {
-        showToast('角色分组不存在');
-        return false;
-    }
-
-    const nextTitleRaw = window.prompt('请输入新的角色名称：', oldTitle || targetGroup.title);
-    if (nextTitleRaw === null) {
-        return false;
-    }
-
-    return renameCharGroupByValue(groupId, nextTitleRaw);
 }
 
 async function renameCharGroupByValue(groupId, nextTitleRaw) {
@@ -323,7 +288,7 @@ function startEdit(tabId, groupId, itemId, categoryKey) {
     const resolvedCategoryKey = categoryKey || '';
     const keepCharsView = activeTab === 'chars' && tabId === 'outfit';
 
-    if (!keepCharsView && tabId !== activeTab) {
+    if (!keepCharsView) {
         activeTab = tabId;
     }
 
@@ -341,10 +306,6 @@ function startEdit(tabId, groupId, itemId, categoryKey) {
     if (missingTarget) {
         showToast('找不到要编辑的条目');
         return;
-    }
-
-    if (!keepCharsView && tabId !== activeTab) {
-        switchToTab(tabId);
     }
 
     editState = { tabId: tabId, groupId: groupId, itemId: itemId, categoryKey: resolvedCategoryKey };
@@ -380,7 +341,7 @@ async function addOutfitEntry() {
         return false;
     }
 
-    let result = await mutatePromptData('addOutfitEntry', {
+    const result = await mutatePromptData('addOutfitEntry', {
         title: title,
         part: part || '未知',
         style: style,
@@ -389,12 +350,6 @@ async function addOutfitEntry() {
         other: other,
         prompt: prompt
     });
-
-    if (!result.ok && String(result.message || '').indexOf('未知操作类型') > -1) {
-        result = await mutatePromptData('addOutfitGroup', {
-            title: title
-        });
-    }
 
     if (!result.ok) {
         return false;
@@ -421,73 +376,6 @@ async function addOutfitEntry() {
     renderTab('outfit');
     showToast(result.message);
     return true;
-}
-
-async function renameOutfitGroup(groupId, oldTitle) {
-    const groups = promptData.outfit || [];
-    const targetGroup = groups.find(function (group) {
-        return group.id === groupId;
-    });
-    if (!targetGroup) {
-        showToast('服装风格不存在');
-        return;
-    }
-
-    const nextTitleRaw = window.prompt('请输入新的风格名称：', oldTitle || targetGroup.title);
-    if (nextTitleRaw === null) {
-        return;
-    }
-
-    const nextTitle = nextTitleRaw.trim();
-    if (!nextTitle) {
-        showToast('风格名称不能为空');
-        return;
-    }
-
-    const result = await mutatePromptData('renameOutfitGroup', {
-        groupId: groupId,
-        title: nextTitle
-    });
-    if (!result.ok) {
-        return;
-    }
-
-    renderTab(activeTab === 'chars' ? 'chars' : 'outfit');
-    showToast(result.message);
-}
-
-async function deleteOutfitGroup(groupId, groupTitle) {
-    const groups = promptData.outfit || [];
-    const targetGroup = groups.find(function (group) {
-        return group.id === groupId;
-    });
-    if (!targetGroup) {
-        showToast('服装风格不存在');
-        return;
-    }
-
-    if (!window.confirm('确认删除风格“' + (groupTitle || targetGroup.title) + '”吗？该风格下的所有子分类条目会一并删除。')) {
-        return;
-    }
-
-    const result = await mutatePromptData('deleteOutfitGroup', { groupId: groupId });
-    if (!result.ok) {
-        return;
-    }
-
-    if (editState && editState.tabId === 'outfit' && editState.groupId === groupId) {
-        editState = null;
-    }
-    if (addState && addState.tabId === 'outfit' && addState.groupId === groupId) {
-        addState = null;
-    }
-
-    renderTab('outfit');
-    showToast(result.message);
-}
-
-async function deleteOutfitItem(groupId, categoryKey, itemId, itemName) {
-    await deleteOutfitEntry(itemId, itemName);
 }
 
 async function deleteOutfitEntry(outfitId, outfitTitle) {
